@@ -36,6 +36,7 @@ class WhatsAppInboundService
         private readonly TicketService $tickets,
         private readonly WhatsAppOutboundService $outbound,
         private readonly RelinkService $relinks,
+        private readonly WhatsAppMediaService $media,
     ) {
     }
 
@@ -57,7 +58,7 @@ class WhatsAppInboundService
 
         // §9.4 rule 1 — commands.
         if (MessageGrammar::parseCommand($body) !== null) {
-            $this->handleCommand($employee, $body, $type);
+            $this->handleCommand($employee, $body, $type, $message);
 
             return;
         }
@@ -100,12 +101,12 @@ class WhatsAppInboundService
             'This number is not registered with the IT helpdesk. Please contact your IT department to enroll.');
     }
 
-    private function handleCommand(Employee $employee, string $body, string $type): void
+    private function handleCommand(Employee $employee, string $body, string $type, array $message): void
     {
         $command = MessageGrammar::parseCommand($body);
 
         match ($command['name']) {
-            'new' => $this->createTicket($employee, $command['arg'], $type, $body),
+            'new' => $this->createTicket($employee, $command['arg'], $type, $body, $message),
             'status' => $this->replyStatus($employee, $command['arg']),
             'close' => $this->closeTicket($employee, $command['arg'], $body),
             'register' => $this->outbound->sendPlainText($employee->whatsapp_number,
@@ -202,10 +203,10 @@ class WhatsAppInboundService
             return;
         }
 
-        $this->createTicket($employee, $body, $type, $body);
+        $this->createTicket($employee, $body, $type, $body, $message);
     }
 
-    private function createTicket(Employee $employee, string $content, string $type, string $rawBody): void
+    private function createTicket(Employee $employee, string $content, string $type, string $rawBody, array $message = []): void
     {
         $subject = $this->deriveSubject($content);
 
@@ -218,7 +219,7 @@ class WhatsAppInboundService
             'status' => TicketStatus::New,
         ]);
 
-        $this->storeInbound($ticket, $rawBody, $type);
+        $this->storeInbound($ticket, $message, $rawBody, $type);
 
         $this->outbound->notifyTicket(
             $ticket,
@@ -231,7 +232,7 @@ class WhatsAppInboundService
 
     private function attach(Ticket $ticket, array $message, Employee $employee): void
     {
-        $this->storeInbound($ticket, (string) ($message['body'] ?? ''), $message['type'] ?? 'text');
+        $this->storeInbound($ticket, $message, (string) ($message['body'] ?? ''), $message['type'] ?? 'text');
     }
 
     private function replyStatus(Employee $employee, string $ticketNumber): void
@@ -257,7 +258,7 @@ class WhatsAppInboundService
             return;
         }
 
-        $this->storeInbound($ticket, $rawBody, 'text');
+        $this->storeInbound($ticket, [], $rawBody, 'text');
 
         if ($ticket->status === TicketStatus::Closed) {
             $this->outbound->sendSession($ticket, $employee, "Ticket {$ticket->ticket_number} is already closed.");
@@ -295,9 +296,9 @@ class WhatsAppInboundService
         );
     }
 
-    private function storeInbound(Ticket $ticket, string $body, string $type): void
+    private function storeInbound(Ticket $ticket, array $message, string $body, string $type): TicketMessage
     {
-        $message = TicketMessage::create([
+        $ticketMessage = TicketMessage::create([
             'ticket_id' => $ticket->id,
             'direction' => MessageDirection::Inbound,
             'channel' => \App\Enums\MessageChannel::WhatsApp,
@@ -306,7 +307,13 @@ class WhatsAppInboundService
             'is_internal' => false,
         ]);
 
+        // §8.4 — download and attach media (image/audio/video/document/sticker).
+        // No-op when WhatsApp is disabled or the message carries no media id.
+        $this->media->attach($ticket, $ticketMessage, $message['media'] ?? []);
+
         $this->touchFirstResponse($ticket);
+
+        return $ticketMessage;
     }
 
     private function touchFirstResponse(Ticket $ticket): void

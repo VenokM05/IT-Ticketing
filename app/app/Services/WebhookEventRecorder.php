@@ -136,7 +136,7 @@ class WebhookEventRecorder
             default => $message['text']['body'] ?? '',
         };
 
-        return [
+        $normalized = [
             'from' => $message['from'] ?? null,
             'message_id' => $message['id'] ?? null,
             'type' => $type,
@@ -144,5 +144,17 @@ class WebhookEventRecorder
             'context_id' => $message['context']['id'] ?? null,
             'timestamp' => isset($message['timestamp']) ? (int) $message['timestamp'] : null,
         ];
+
+        // Media id is a transient reference passed to the job (like the body) so it
+        // can be downloaded; it is never persisted on the event row (§13.1).
+        if (isset($message[$type]['id'])) {
+            $normalized['media'] = [
+                'id' => $message[$type]['id'],
+                'mime_type' => $message[$type]['mime_type'] ?? null,
+                'filename' => $message[$type]['filename'] ?? $message[$type]['file_name'] ?? null,
+            ];
+        }
+
+        return $normalized;
     }
 }
