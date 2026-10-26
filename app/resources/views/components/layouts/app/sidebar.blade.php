@@ -16,6 +16,9 @@
                     <flux:navlist.item icon="home" :href="route('dashboard')" :current="request()->routeIs('dashboard')" wire:navigate>Dashboard</flux:navlist.item>
                     <flux:navlist.item icon="ticket" :href="route('tickets')" :current="request()->routeIs('tickets*')" wire:navigate>Tickets</flux:navlist.item>
                     <flux:navlist.item icon="bell" :href="route('notifications')" :current="request()->routeIs('notifications')" wire:navigate>Notifications</flux:navlist.item>
+                    @if (auth()->user()?->isAdmin())
+                        <flux:navlist.item icon="user-group" :href="route('employees')" :current="request()->routeIs('employees*')" wire:navigate>Employees</flux:navlist.item>
+                    @endif
                 </flux:navlist.group>
             </flux:navlist>
 
