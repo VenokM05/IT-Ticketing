@@ -7,9 +7,14 @@ Route::get('/', function () {
     return view('welcome');
 })->name('home');
 
-Route::view('dashboard', 'dashboard')
-    ->middleware(['auth', 'verified'])
-    ->name('dashboard');
+Route::middleware(['auth', 'verified'])->group(function () {
+    Volt::route('dashboard', 'dashboard')->name('dashboard');
+    Volt::route('notifications', 'notifications')->name('notifications');
+
+    Volt::route('tickets', 'tickets.index')->name('tickets');
+    Volt::route('tickets/{ticket}', 'tickets.show')
+        ->name('tickets.show');
+});
 
 Route::middleware(['auth'])->group(function () {
     Route::redirect('settings', 'settings/profile');

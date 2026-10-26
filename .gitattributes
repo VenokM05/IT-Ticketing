@@ -1,0 +1,23 @@
+* text=auto
+
+# Laravel / PHP + web source
+*.php   text eol=lf
+*.css   text eol=lf
+*.js    text eol=lf
+*.json  text eol=lf
+*.md    text eol=lf
+*.xml   text eol=lf
+*.yml   text eol=lf
+
+# Shell must stay LF
+*.sh    text eol=lf
+
+# Binaries
+*.png   binary
+*.jpg   binary
+*.jpeg  binary
+*.gif   binary
+*.ico   binary
+*.woff  binary
+*.woff2 binary
+*.pdf   binary

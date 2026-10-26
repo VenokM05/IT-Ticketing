@@ -14,7 +14,7 @@ return new class extends Migration
             $table->foreignId('user_id')->constrained()->cascadeOnDelete();
             $table->text('work_performed')->nullable();
             $table->text('findings')->nullable();
-            $table->text('update_text');
+            $table->text('update_text')->nullable();
             $table->string('next_action')->nullable();
             $table->unsignedInteger('minutes_spent')->nullable();
             $table->boolean('is_internal')->default(false);

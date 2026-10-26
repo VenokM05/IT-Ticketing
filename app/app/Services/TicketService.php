@@ -18,8 +18,10 @@ use Illuminate\Support\Facades\DB;
  */
 class TicketService
 {
-    public function __construct(private readonly TicketNumberGenerator $numbers)
-    {
+    public function __construct(
+        private readonly TicketNumberGenerator $numbers,
+        private readonly NotificationService $notifications,
+    ) {
     }
 
     /**
@@ -37,6 +39,7 @@ class TicketService
             ]);
 
             $this->recordHistory($ticket, null, $ticket->status, $actor, 'Ticket created');
+            $this->notifications->ticketCreated($ticket);
 
             return $ticket;
         });
@@ -83,6 +86,8 @@ class TicketService
 
             $fresh->save();
             $this->recordHistory($fresh, $fresh->status, $fresh->status, $actor, $note);
+            $fresh->load('assignee');
+            $this->notifications->ticketAssigned($fresh);
 
             return $fresh;
         });
@@ -149,7 +154,16 @@ class TicketService
         $ticket->status = $to;
         $ticket->save();
 
-        $this->recordHistory($ticket, $from, $to, $actor, $remark);
+        $history = $this->recordHistory($ticket, $from, $to, $actor, $remark);
+
+        // New-ticket and assignment events already carry their own notification
+        // types; a plain transition emits StatusChanged (§7.8 event rows).
+        if ($to === TicketStatus::Assigned) {
+            $ticket->load('assignee');
+            $this->notifications->ticketAssigned($ticket);
+        } elseif ($from !== TicketStatus::New) {
+            $this->notifications->statusChanged($ticket, $history);
+        }
 
         return $ticket;
     }

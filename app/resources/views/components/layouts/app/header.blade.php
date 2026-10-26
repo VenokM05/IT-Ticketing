@@ -15,33 +15,16 @@
                 <flux:navbar.item icon="layout-grid" href="{{ route('dashboard') }}" :current="request()->routeIs('dashboard')" wire:navigate>
                     Dashboard
                 </flux:navbar.item>
+                <flux:navbar.item icon="ticket" href="{{ route('tickets') }}" :current="request()->routeIs('tickets*')" wire:navigate>
+                    Tickets
+                </flux:navbar.item>
             </flux:navbar>
 
             <flux:spacer />
 
-            <flux:navbar class="mr-1.5 space-x-0.5 py-0!">
-                <flux:tooltip content="Search" position="bottom">
-                    <flux:navbar.item class="!h-10 [&>div>svg]:size-5" icon="magnifying-glass" href="#" label="Search" />
-                </flux:tooltip>
-                <flux:tooltip content="Repository" position="bottom">
-                    <flux:navbar.item
-                        class="h-10 max-lg:hidden [&>div>svg]:size-5"
-                        icon="folder-git-2"
-                        href="https://github.com/laravel/livewire-starter-kit"
-                        target="_blank"
-                        label="Repository"
-                    />
-                </flux:tooltip>
-                <flux:tooltip content="Documentation" position="bottom">
-                    <flux:navbar.item
-                        class="h-10 max-lg:hidden [&>div>svg]:size-5"
-                        icon="book-open-text"
-                        href="https://laravel.com/docs/starter-kits"
-                        target="_blank"
-                        label="Documentation"
-                    />
-                </flux:tooltip>
-            </flux:navbar>
+            @if (auth()->check())
+                <livewire:notification-bell />
+            @endif
 
             <!-- Desktop User Menu -->
             <flux:dropdown position="top" align="end">
@@ -101,20 +84,16 @@
                     <flux:navlist.item icon="layout-grid" href="{{ route('dashboard') }}" :current="request()->routeIs('dashboard')" wire:navigate>
                         Dashboard
                     </flux:navlist.item>
+                    <flux:navlist.item icon="ticket" href="{{ route('tickets') }}" :current="request()->routeIs('tickets*')" wire:navigate>
+                        Tickets
+                    </flux:navlist.item>
+                    <flux:navlist.item icon="bell" href="{{ route('notifications') }}" :current="request()->routeIs('notifications')" wire:navigate>
+                        Notifications
+                    </flux:navlist.item>
                 </flux:navlist.group>
             </flux:navlist>
 
             <flux:spacer />
-
-            <flux:navlist variant="outline">
-                <flux:navlist.item icon="folder-git-2" href="https://github.com/laravel/livewire-starter-kit" target="_blank">
-                    Repository
-                </flux:navlist.item>
-
-                <flux:navlist.item icon="book-open-text" href="https://laravel.com/docs/starter-kits" target="_blank">
-                    Documentation
-                </flux:navlist.item>
-            </flux:navlist>
         </flux:sidebar>
 
         {{ $slot }}

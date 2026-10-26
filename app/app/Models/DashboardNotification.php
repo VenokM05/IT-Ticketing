@@ -15,6 +15,7 @@ class DashboardNotification extends Model
         'user_id',
         'ticket_id',
         'type',
+        'ref_id',
         'title',
         'message',
         'data',
