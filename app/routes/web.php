@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\ReportExportController;
 use Illuminate\Support\Facades\Route;
 use Livewire\Volt\Volt;
 
@@ -22,6 +23,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     // Number-relink approvals — administrator only (§9.3, §10.7).
     Volt::route('relinks', 'relinks.index')->name('relinks');
+
+    // Operational reporting — administrator only (Phase 6); gated in the page/controller.
+    Volt::route('reports', 'reports.index')->name('reports');
+    Route::get('reports/export', ReportExportController::class)->name('reports.export');
 });
 
 Route::middleware(['auth'])->group(function () {
