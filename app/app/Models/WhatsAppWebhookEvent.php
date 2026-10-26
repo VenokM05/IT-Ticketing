@@ -11,6 +11,8 @@ class WhatsAppWebhookEvent extends Model
 {
     use HasFactory;
 
+    protected $table = 'whatsapp_webhook_events';
+
     protected $fillable = [
         'event_key',
         'event_type',

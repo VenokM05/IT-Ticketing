@@ -19,6 +19,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Volt::route('employees', 'employees.index')->name('employees');
     Volt::route('employees/{employee}', 'employees.show')
         ->name('employees.show');
+
+    // Number-relink approvals — administrator only (§9.3, §10.7).
+    Volt::route('relinks', 'relinks.index')->name('relinks');
 });
 
 Route::middleware(['auth'])->group(function () {

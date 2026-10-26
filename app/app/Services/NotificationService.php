@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Enums\NotificationType;
 use App\Enums\UserRole;
 use App\Models\DashboardNotification;
+use App\Models\RelinkRequest;
 use App\Models\Ticket;
 use App\Models\TicketStatusHistory;
 use App\Models\User;
@@ -66,6 +67,30 @@ class NotificationService
             refId: $history->id,
             data: ['from' => $history->from_status?->value, 'to' => $history->to_status->value],
         );
+    }
+
+    /**
+     * Number-relink approval alert for every active administrator (PRD §9.3, §10.7).
+     * Not tied to a ticket, so ticket_id is null and the relink request id is the ref.
+     */
+    public function relinkRequested(RelinkRequest $request): void
+    {
+        User::query()
+            ->where('role', UserRole::Admin->value)
+            ->where('is_active', true)
+            ->each(fn (User $admin) => DashboardNotification::query()->firstOrCreate(
+                [
+                    'user_id' => $admin->id,
+                    'type' => NotificationType::RelinkRequest->value,
+                    'ticket_id' => null,
+                    'ref_id' => $request->id,
+                ],
+                [
+                    'title' => 'Number relink request',
+                    'message' => 'Approval needed to link '.$request->requested_number.' to an employee.',
+                    'data' => ['requested_number' => $request->requested_number],
+                ],
+            ));
     }
 
     /**

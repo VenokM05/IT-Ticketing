@@ -84,6 +84,10 @@ new #[Layout('components.layouts.app')] #[Title('Notifications')] class extends 
                                 <a href="{{ route('tickets.show', $notification->ticket) }}" wire:navigate class="truncate text-sm font-medium text-blue-600 hover:underline dark:text-blue-400">
                                     {{ $notification->title }}
                                 </a>
+                            @elseif ($notification->type === \App\Enums\NotificationType::RelinkRequest)
+                                <a href="{{ route('relinks') }}" wire:navigate class="truncate text-sm font-medium text-blue-600 hover:underline dark:text-blue-400">
+                                    {{ $notification->title }}
+                                </a>
                             @else
                                 <span class="truncate text-sm font-medium">{{ $notification->title }}</span>
                             @endif

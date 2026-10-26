@@ -49,4 +49,23 @@ class Employee extends Model
             ? $digits
             : '+'.$digits;
     }
+
+    /**
+     * Find an active employee by WhatsApp number, tolerant of a leading '+' and
+     * formatting differences. WhatsApp's webhook "from" is bare digits, while
+     * records may be stored with a '+' (PRD §9.1, §9.2).
+     */
+    public static function findByNumber(?string $raw): ?self
+    {
+        $digits = preg_replace('/\D/', '', (string) $raw);
+
+        if ($digits === '') {
+            return null;
+        }
+
+        return static::query()
+            ->where('is_active', true)
+            ->where(fn ($q) => $q->where('whatsapp_number', $digits)->orWhere('whatsapp_number', '+'.$digits))
+            ->first();
+    }
 }

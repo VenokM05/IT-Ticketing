@@ -15,5 +15,8 @@ class DatabaseSeeder extends Seeder
     {
         // Demo logins + ticket data for the Phase 4 dashboard.
         $this->call(DemoTicketSeeder::class);
+
+        // §11.3 outbound template inventory.
+        $this->call(WhatsAppTemplateSeeder::class);
     }
 }
