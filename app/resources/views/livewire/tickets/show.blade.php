@@ -1,5 +1,8 @@
 <?php
 
+use App\Enums\MessageChannel;
+use App\Enums\MessageDirection;
+use App\Enums\MessageType;
 use App\Enums\TicketCategory;
 use App\Enums\TicketPriority;
 use App\Enums\TicketStatus;
@@ -7,8 +10,10 @@ use App\Enums\UserRole;
 use App\Exceptions\InvalidStatusTransition;
 use App\Models\DashboardNotification;
 use App\Models\Ticket;
+use App\Models\TicketMessage;
 use App\Models\User;
 use App\Services\TicketService;
+use App\Services\WhatsAppOutboundService;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
 use Livewire\Volt\Component;
@@ -24,6 +29,22 @@ new #[Layout('components.layouts.app')] #[Title('Ticket')] class extends Compone
 
     public string $classPriority = '';
 
+    public string $progressWork = '';
+
+    public string $progressFindings = '';
+
+    public string $progressNext = '';
+
+    public string $progressMinutes = '';
+
+    public string $progressNote = '';
+
+    public bool $progressInternal = false;
+
+    public string $noteBody = '';
+
+    public bool $noteInternal = true;
+
     public function mount(Ticket $ticket): void
     {
         // Server-side authorization on every page (FR-13).
@@ -37,7 +58,7 @@ new #[Layout('components.layouts.app')] #[Title('Ticket')] class extends Compone
             'assignee',
             'messages' => fn ($q) => $q->with('user')->orderBy('created_at'),
             'attachments',
-            'progressUpdates' => fn ($q) => $q->with('user')->orderByDesc('created_at'),
+            'progressUpdates' => fn ($q) => $q->with('author')->orderByDesc('created_at'),
             'reports' => fn ($q) => $q->orderByDesc('created_at'),
             'statusHistories' => fn ($q) => $q->with('changer')->orderByDesc('created_at'),
         ]);
@@ -113,12 +134,76 @@ new #[Layout('components.layouts.app')] #[Title('Ticket')] class extends Compone
         session()->flash('success', 'Ticket updated');
     }
 
+    public function addProgress(): void
+    {
+        $this->authorize('addProgress', $this->ticket);
+
+        $this->validate([
+            'progressWork' => ['nullable', 'string', 'max:2000'],
+            'progressFindings' => ['nullable', 'string', 'max:2000'],
+            'progressNext' => ['nullable', 'string', 'max:500'],
+            'progressMinutes' => ['nullable', 'integer', 'min:0', 'max:100000'],
+            'progressNote' => ['nullable', 'string', 'max:2000'],
+        ]);
+
+        // Require at least one substantive field so an empty entry is never stored.
+        if (collect([$this->progressWork, $this->progressFindings, $this->progressNext, $this->progressNote])->every(fn ($v) => trim((string) $v) === '')) {
+            $this->addError('progressWork', 'Enter at least one progress field.');
+
+            return;
+        }
+
+        app(TicketService::class)->addProgress($this->ticket, auth()->user(), [
+            'work_performed' => $this->progressWork ?: null,
+            'findings' => $this->progressFindings ?: null,
+            'next_action' => $this->progressNext ?: null,
+            'minutes_spent' => $this->progressMinutes === '' ? null : (int) $this->progressMinutes,
+            'update_text' => $this->progressNote ?: null,
+            'is_internal' => $this->progressInternal,
+        ]);
+
+        $this->reset(['progressWork', 'progressFindings', 'progressNext', 'progressMinutes', 'progressNote', 'progressInternal']);
+        $this->refreshTicket();
+        session()->flash('success', 'Progress recorded');
+    }
+
+    public function addNote(): void
+    {
+        $this->authorize('update', $this->ticket);
+
+        $validated = $this->validate(['noteBody' => ['required', 'string', 'max:2000']]);
+        $body = $validated['noteBody'];
+        $wasInternal = $this->noteInternal;
+        $employee = $this->ticket->employee;
+
+        // Employee-visible notes dispatch over WhatsApp when live; internal notes
+        // (and visible notes while WhatsApp is disabled) persist to the history only.
+        if (! $wasInternal && config('services.whatsapp.enabled') && $employee?->whatsapp_number) {
+            app(WhatsAppOutboundService::class)->sendSession($this->ticket, $employee, $body);
+        } else {
+            TicketMessage::create([
+                'ticket_id' => $this->ticket->id,
+                'user_id' => auth()->id(),
+                'direction' => MessageDirection::Outbound,
+                'channel' => MessageChannel::WhatsApp,
+                'message_type' => MessageType::Text,
+                'body' => $body,
+                'is_internal' => $wasInternal,
+            ]);
+        }
+
+        $this->reset('noteBody');
+        $this->noteInternal = true;
+        $this->refreshTicket();
+        session()->flash('success', $wasInternal ? 'Internal note added' : 'Note added');
+    }
+
     private function refreshTicket(): void
     {
         $this->ticket->refresh()->load([
             'assignee',
             'messages' => fn ($q) => $q->with('user')->orderBy('created_at'),
-            'progressUpdates' => fn ($q) => $q->with('user')->orderByDesc('created_at'),
+            'progressUpdates' => fn ($q) => $q->with('author')->orderByDesc('created_at'),
             'reports' => fn ($q) => $q->orderByDesc('created_at'),
             'statusHistories' => fn ($q) => $q->with('changer')->orderByDesc('created_at'),
         ]);
@@ -144,6 +229,7 @@ new #[Layout('components.layouts.app')] #[Title('Ticket')] class extends Compone
                 ->get(),
             'canUpdate' => auth()->user()->can('update', $this->ticket),
             'canAssign' => auth()->user()->can('assign', $this->ticket),
+            'canProgress' => auth()->user()->can('addProgress', $this->ticket),
         ];
     }
 }; ?>
@@ -197,7 +283,7 @@ new #[Layout('components.layouts.app')] #[Title('Ticket')] class extends Compone
                                     @if ($message->is_internal)
                                         <span class="italic">internal</span>
                                     @endif
-                                    <span class="capitalize">{{ $message->delivery_status->value }}</span>
+                                    <span class="capitalize">{{ $message->delivery_status?->value ?? 'not delivered' }}</span>
                                 </div>
                                 {{ $message->body }}
                             </div>
@@ -231,7 +317,7 @@ new #[Layout('components.layouts.app')] #[Title('Ticket')] class extends Compone
                 @forelse ($ticket->progressUpdates as $update)
                     <div class="mt-3 rounded-lg border border-zinc-200 p-3 text-sm dark:border-zinc-700">
                         <div class="flex items-center justify-between text-xs text-zinc-500 dark:text-zinc-400">
-                            <span>{{ $update->user?->name ?? 'System' }} · {{ $update->created_at->format('Y-m-d H:i') }}</span>
+                            <span>{{ $update->author?->name ?? 'System' }} · {{ $update->created_at->format('Y-m-d H:i') }}</span>
                             <span>
                                 @if ($update->minutes_spent) {{ $update->minutes_spent }} min · @endif
                                 {{ $update->is_internal ? 'Internal' : 'Employee-visible' }}
@@ -367,6 +453,36 @@ new #[Layout('components.layouts.app')] #[Title('Ticket')] class extends Compone
                     </flux:select>
                     <flux:button size="sm" wire:click="assign" class="mt-2">Assign / reassign</flux:button>
                     <p class="mt-2 text-xs text-zinc-500 dark:text-zinc-400">Assigning a New ticket moves it to Assigned (FR-06).</p>
+                </div>
+            @endif
+
+            @if ($canProgress)
+                <div class="rounded-xl border border-zinc-200 bg-white p-4 dark:border-zinc-700 dark:bg-zinc-900">
+                    <h2 class="text-sm font-semibold">Log progress</h2>
+                    <div class="mt-2 space-y-2">
+                        <flux:textarea wire:model="progressWork" label="Work performed" rows="2" placeholder="What did you do?" />
+                        <flux:textarea wire:model="progressFindings" label="Findings" rows="2" placeholder="What did you find?" />
+                        <flux:input wire:model="progressNext" label="Next steps" placeholder="What is next?" />
+                        <flux:input wire:model="progressMinutes" label="Time spent (minutes)" type="number" min="0" />
+                        <flux:textarea wire:model="progressNote" label="Note" rows="2" placeholder="Free-text note (optional)" />
+                        <flux:checkbox wire:model="progressInternal" label="Internal only (hide from employee)" />
+                        @error('progressWork') <p class="text-xs text-red-600">{{ $message }}</p> @enderror
+                        <flux:button size="sm" variant="primary" wire:click="addProgress">Record progress</flux:button>
+                        <p class="text-xs text-zinc-500 dark:text-zinc-400">The first entry finalizes the draft formal report (FR-10).</p>
+                    </div>
+                </div>
+            @endif
+
+            @if ($canUpdate)
+                <div class="rounded-xl border border-zinc-200 bg-white p-4 dark:border-zinc-700 dark:bg-zinc-900">
+                    <h2 class="text-sm font-semibold">Add note</h2>
+                    <div class="mt-2 space-y-2">
+                        <flux:textarea wire:model="noteBody" rows="2" placeholder="Internal memo or employee-visible message…" />
+                        <flux:checkbox wire:model="noteInternal" label="Internal only (hide from employee)" />
+                        @error('noteBody') <p class="text-xs text-red-600">{{ $message }}</p> @enderror
+                        <flux:button size="sm" wire:click="addNote">Add note</flux:button>
+                        <p class="text-xs text-zinc-500 dark:text-zinc-400">Unchecking “internal” sends the note to the employee over WhatsApp when messaging is enabled (§11).</p>
+                    </div>
                 </div>
             @endif
         </div>

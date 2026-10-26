@@ -266,7 +266,7 @@ class WhatsAppInboundService
             return;
         }
 
-        $closed = $this->tickets->changeStatus($ticket, TicketStatus::Closed, null, 'Closed by employee via WhatsApp');
+        $closed = $this->tickets->changeStatus($ticket, TicketStatus::Closed, null, 'Closed by employee via WhatsApp', notifyEmployee: false);
         $this->outbound->sendSession($closed, $employee, "Ticket {$closed->ticket_number} has been closed. Reply with a new message any time to reopen or add details.");
     }
 

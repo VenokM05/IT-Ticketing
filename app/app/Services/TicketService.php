@@ -8,6 +8,7 @@ use App\Enums\TicketStatus;
 use App\Exceptions\InvalidStatusTransition;
 use App\Models\Ticket;
 use App\Models\TicketProgressReport;
+use App\Models\TicketProgressUpdate;
 use App\Models\TicketStatusHistory;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
@@ -21,6 +22,7 @@ class TicketService
     public function __construct(
         private readonly TicketNumberGenerator $numbers,
         private readonly NotificationService $notifications,
+        private readonly WhatsAppOutboundService $whatsapp,
     ) {
     }
 
@@ -47,18 +49,28 @@ class TicketService
 
     /**
      * Transition a ticket to a new status, enforcing the §5.2 matrix.
+     *
+     * @param  bool  $notifyEmployee  emit the §11 employee WhatsApp notification. Disabled
+     *      for WhatsApp-command-driven transitions that already reply inline.
      */
     public function changeStatus(
         Ticket $ticket,
         TicketStatus $to,
         ?User $actor = null,
         ?string $remark = null,
+        bool $notifyEmployee = true,
     ): Ticket {
-        return DB::transaction(function () use ($ticket, $to, $actor, $remark) {
+        $updated = DB::transaction(function () use ($ticket, $to, $actor, $remark) {
             $fresh = Ticket::query()->whereKey($ticket->id)->lockForUpdate()->firstOrFail();
 
             return $this->applyTransition($fresh, $to, $actor, $remark);
         });
+
+        if ($notifyEmployee) {
+            $this->notifyEmployeeTransition($updated, $to);
+        }
+
+        return $updated;
     }
 
     /**
@@ -69,8 +81,9 @@ class TicketService
         User $technician,
         ?User $actor = null,
         ?string $remarks = null,
+        bool $notifyEmployee = true,
     ): Ticket {
-        return DB::transaction(function () use ($ticket, $technician, $actor, $remarks) {
+        $updated = DB::transaction(function () use ($ticket, $technician, $actor, $remarks) {
             $fresh = Ticket::query()->whereKey($ticket->id)->lockForUpdate()->firstOrFail();
 
             $fresh->assigned_to = $technician->id;
@@ -90,6 +103,49 @@ class TicketService
             $this->notifications->ticketAssigned($fresh);
 
             return $fresh;
+        });
+
+        if ($notifyEmployee) {
+            $this->notifyEmployeeTransition($updated, TicketStatus::Assigned);
+        }
+
+        return $updated;
+    }
+
+    /**
+     * Record a technician progress entry (§10.5). The first substantive entry
+     * finalizes the draft initial report with the technician's fields (FR-10).
+     *
+     * @param  array<string, mixed>  $fields
+     */
+    public function addProgress(Ticket $ticket, User $author, array $fields): TicketProgressUpdate
+    {
+        return DB::transaction(function () use ($ticket, $author, $fields) {
+            $update = TicketProgressUpdate::create([
+                'ticket_id' => $ticket->id,
+                'user_id' => $author->id,
+                'work_performed' => $fields['work_performed'] ?? null,
+                'findings' => $fields['findings'] ?? null,
+                'update_text' => $fields['update_text'] ?? null,
+                'next_action' => $fields['next_action'] ?? null,
+                'minutes_spent' => $fields['minutes_spent'] ?? null,
+                'is_internal' => (bool) ($fields['is_internal'] ?? false),
+            ]);
+
+            $draft = TicketProgressReport::query()
+                ->where('ticket_id', $ticket->id)
+                ->where('status', ReportStatus::Draft)
+                ->first();
+
+            if ($draft && ($update->work_performed || $update->findings || $update->next_action)) {
+                $this->finalizeReport($draft, $author, [
+                    'work_performed' => $update->work_performed,
+                    'findings' => $update->findings,
+                    'next_steps' => $update->next_action,
+                ]);
+            }
+
+            return $update;
         });
     }
 
@@ -117,6 +173,44 @@ class TicketService
 
             return $locked;
         });
+    }
+
+    /**
+     * Emit the §11 employee WhatsApp notification for a lifecycle event. Gated behind
+     * WHATSAPP_ENABLED (no live credentials -> nothing dispatched); the outbound
+     * service applies the §11.2 window/template routing and persists the message so
+     * its delivery state can be reconciled (§8.5, §11.4).
+     */
+    private function notifyEmployeeTransition(Ticket $ticket, TicketStatus $status): void
+    {
+        if (! config('services.whatsapp.enabled')) {
+            return;
+        }
+
+        $ticket->loadMissing(['employee', 'assignee']);
+        $employee = $ticket->employee;
+
+        if (! $employee || ! $employee->whatsapp_number) {
+            return;
+        }
+
+        $number = $ticket->ticket_number;
+        $technician = $ticket->assignee?->name ?? 'a technician';
+
+        [$session, $template, $params] = match ($status) {
+            TicketStatus::Assigned => ["Ticket {$number} has been assigned to {$technician}.", 'ticket_assigned', [$number, $technician]],
+            TicketStatus::InProgress => ["Work has started on ticket {$number}.", 'ticket_in_progress', [$number]],
+            TicketStatus::Pending => ["Ticket {$number} is pending more information.", 'ticket_pending', [$number]],
+            TicketStatus::Resolved => ["Ticket {$number} has been resolved.", 'ticket_resolved', [$number]],
+            TicketStatus::Closed => ["Ticket {$number} has been closed.", 'ticket_closed', [$number]],
+            default => [null, null, []],
+        };
+
+        if ($session === null) {
+            return; // New carries no §11.3 template; intake handles acknowledgment.
+        }
+
+        $this->whatsapp->notifyTicket($ticket, $employee, $session, $template, $params);
     }
 
     /**
