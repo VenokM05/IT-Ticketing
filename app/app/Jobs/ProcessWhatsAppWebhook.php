@@ -26,8 +26,7 @@ class ProcessWhatsAppWebhook implements ShouldQueue
         public int $eventId,
         public array $message,
         public string $kind,
-    ) {
-    }
+    ) {}
 
     public function handle(WhatsAppInboundService $inbound, WhatsAppOutboundService $outbound): void
     {

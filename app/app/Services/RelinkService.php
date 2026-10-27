@@ -15,9 +15,7 @@ use Illuminate\Validation\ValidationException;
  */
 class RelinkService
 {
-    public function __construct(private readonly NotificationService $notifications)
-    {
-    }
+    public function __construct(private readonly NotificationService $notifications) {}
 
     /**
      * Raise (idempotently) a pending relink request for a number we could not match.

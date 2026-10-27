@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Enums\MessageChannel;
 use App\Enums\MessageDirection;
 use App\Enums\MessageType;
 use App\Enums\TicketCategory;
@@ -13,6 +14,7 @@ use App\Models\TicketMessage;
 use App\Support\MessageGrammar;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Str;
 
 /**
  * Inbound message pipeline (PRD §8.4). Identifies the employee, then classifies
@@ -37,8 +39,7 @@ class WhatsAppInboundService
         private readonly WhatsAppOutboundService $outbound,
         private readonly RelinkService $relinks,
         private readonly WhatsAppMediaService $media,
-    ) {
-    }
+    ) {}
 
     /**
      * @param  array{from?: string, message_id?: string, type?: string, body?: string|null, context_id?: string|null, timestamp?: int}  $message
@@ -301,7 +302,7 @@ class WhatsAppInboundService
         $ticketMessage = TicketMessage::create([
             'ticket_id' => $ticket->id,
             'direction' => MessageDirection::Inbound,
-            'channel' => \App\Enums\MessageChannel::WhatsApp,
+            'channel' => MessageChannel::WhatsApp,
             'message_type' => MessageType::tryFrom($type) ?? MessageType::Text,
             'body' => $body !== '' ? $body : null,
             'is_internal' => false,
@@ -337,7 +338,7 @@ class WhatsAppInboundService
     {
         $first = trim(preg_replace('/\s+/', ' ', $content));
 
-        return \Illuminate\Support\Str::limit($first !== '' ? $first : 'WhatsApp request', 80);
+        return Str::limit($first !== '' ? $first : 'WhatsApp request', 80);
     }
 
     /** Rate-limited reply: at most one send per cache key per cooldown (§9.2). */

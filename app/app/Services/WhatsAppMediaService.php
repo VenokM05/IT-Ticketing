@@ -22,9 +22,7 @@ class WhatsAppMediaService
 {
     private const MAX_BYTES = 100_000_000; // 100 MB Cloud API media ceiling.
 
-    public function __construct(private readonly WhatsAppCloudApi $api)
-    {
-    }
+    public function __construct(private readonly WhatsAppCloudApi $api) {}
 
     public function enabled(): bool
     {

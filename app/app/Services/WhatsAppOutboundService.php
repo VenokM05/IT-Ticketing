@@ -22,9 +22,7 @@ use Illuminate\Support\Carbon;
  */
 class WhatsAppOutboundService
 {
-    public function __construct(private readonly WhatsAppCloudApi $api)
-    {
-    }
+    public function __construct(private readonly WhatsAppCloudApi $api) {}
 
     public function lastInboundAt(Employee $employee): ?Carbon
     {

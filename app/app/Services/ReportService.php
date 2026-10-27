@@ -2,7 +2,6 @@
 
 namespace App\Services;
 
-use App\Enums\TicketCategory;
 use App\Enums\TicketPriority;
 use App\Enums\TicketStatus;
 use App\Models\Ticket;

@@ -44,7 +44,7 @@ class WeeklySummaryReport extends Command
             message: trim(
                 "Created {$totals['created']} · Resolved {$totals['resolved']} · Closed {$totals['closed']}"
                 ." · Still open {$totals['open']}"
-                ." · Avg resolution ".ReportService::humanize($metrics['resolution_avg_minutes'])
+                .' · Avg resolution '.ReportService::humanize($metrics['resolution_avg_minutes'])
                 .($companies !== '' ? " · Top companies: {$companies}" : '')
             ),
             data: [

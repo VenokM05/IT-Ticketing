@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\ReportType;
 use App\Enums\TicketCategory;
 use App\Enums\TicketPriority;
 use App\Enums\TicketStatus;
@@ -101,7 +102,7 @@ class Ticket extends Model
     public function initialReport()
     {
         return $this->hasOne(TicketProgressReport::class)
-            ->where('report_type', \App\Enums\ReportType::Initial->value);
+            ->where('report_type', ReportType::Initial->value);
     }
 
     public function isOpen(): bool

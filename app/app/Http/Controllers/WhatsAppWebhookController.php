@@ -2,8 +2,8 @@
 
 namespace App\Http\Controllers;
 
-use App\Services\WhatsAppSettings;
 use App\Services\WebhookEventRecorder;
+use App\Services\WhatsAppSettings;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
@@ -14,9 +14,7 @@ use Illuminate\Http\Response;
  */
 class WhatsAppWebhookController extends Controller
 {
-    public function __construct(private readonly WebhookEventRecorder $recorder)
-    {
-    }
+    public function __construct(private readonly WebhookEventRecorder $recorder) {}
 
     /**
      * Meta subscription verification (§8.1). Returns the challenge only when the

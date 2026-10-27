@@ -2,7 +2,11 @@
 
 use App\Models\SystemSetting;
 use App\Models\User;
+use App\Services\WhatsAppCloudApi;
 use App\Services\WhatsAppSettings;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Http;
 use Livewire\Volt\Volt;
 
 /*
@@ -29,7 +33,7 @@ it('forbids technicians and redirects guests from WhatsApp settings', function (
         ->get(route('settings.whatsapp'))
         ->assertForbidden();
 
-    Illuminate\Support\Facades\Auth::guard('web')->forgetUser();
+    Auth::guard('web')->forgetUser();
     $this->get(route('settings.whatsapp'))->assertRedirect(route('login'));
 });
 
@@ -55,7 +59,7 @@ it('stores the API key trimmed and encrypted and masks it in the UI', function (
     $row = SystemSetting::query()->where('key', 'whatsapp.access_token')->sole();
 
     // Encrypted at rest: the raw column must not contain the secret...
-    $raw = Illuminate\Support\Facades\DB::table('system_settings')
+    $raw = DB::table('system_settings')
         ->where('key', 'whatsapp.access_token')->value('value');
     expect($raw)->not->toContain('EAQAYJ1234')
         // ...while the model cast decrypts it, trimmed on the way in.
@@ -96,13 +100,13 @@ it('sends outbound messages with the admin-stored token', function () {
 
     WhatsAppSettings::setAccessToken('admin-token-9999');
 
-    Illuminate\Support\Facades\Http::fake(['graph.facebook.com/*' => Illuminate\Support\Facades\Http::response([
+    Http::fake(['graph.facebook.com/*' => Http::response([
         'messages' => [['id' => 'wamid.TEST']],
     ], 200)]);
 
     app(WhatsAppCloudApiProbe::class)->probe();
 
-    Illuminate\Support\Facades\Http::assertSent(
+    Http::assertSent(
         fn ($request) => $request->hasHeader('Authorization', 'Bearer admin-token-9999'),
     );
 });
@@ -120,7 +124,7 @@ it('removes the stored key through the UI action', function () {
 });
 
 /** Resolves the credential the same way WhatsAppCloudApi does, for the send assertion. */
-class WhatsAppCloudApiProbe extends App\Services\WhatsAppCloudApi
+class WhatsAppCloudApiProbe extends WhatsAppCloudApi
 {
     public function probe(): void
     {

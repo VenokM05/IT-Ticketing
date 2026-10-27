@@ -1,7 +1,10 @@
 <?php
 
 use App\Enums\NotificationType;
+use App\Models\Company;
 use App\Models\DashboardNotification;
+use App\Models\Department;
+use App\Models\Employee;
 use App\Models\Ticket;
 use App\Models\User;
 use App\Services\TicketService;
@@ -47,10 +50,10 @@ it('shows the public requester snapshot name in the latest list (no enrolled emp
 
 it('shows the requester company and department columns in the latest list', function () {
     $admin = dashAdmin();
-    $company = \App\Models\Company::factory()->create(['name' => 'Acme Manufacturing', 'code' => null]);
-    $employee = \App\Models\Employee::factory()->create([
+    $company = Company::factory()->create(['name' => 'Acme Manufacturing', 'code' => null]);
+    $employee = Employee::factory()->create([
         'company_id' => $company,
-        'department_id' => \App\Models\Department::factory()->create(['name' => 'Finance']),
+        'department_id' => Department::factory()->create(['name' => 'Finance']),
     ]);
     // Direct factory creation skips the service's company inheritance, so stamp it.
     Ticket::factory()->create([
@@ -106,7 +109,7 @@ it('notifies admins on create and the technician on assignment through the servi
 
     // Creation and assignment both routed through TicketService so events fire.
     $ticket = app(TicketService::class)->createTicket([
-        'employee_id' => \App\Models\Employee::factory()->create()->id,
+        'employee_id' => Employee::factory()->create()->id,
         'subject' => 'VPN locked out',
         'description' => 'Cannot connect since this morning.',
     ], $admin);

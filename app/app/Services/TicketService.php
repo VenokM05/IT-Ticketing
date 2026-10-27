@@ -25,8 +25,7 @@ class TicketService
         private readonly TicketNumberGenerator $numbers,
         private readonly NotificationService $notifications,
         private readonly WhatsAppOutboundService $whatsapp,
-    ) {
-    }
+    ) {}
 
     /**
      * Create a new ticket from validated intake data (PRD FR-02).
@@ -123,7 +122,7 @@ class TicketService
      * Transition a ticket to a new status, enforcing the §5.2 matrix.
      *
      * @param  bool  $notifyEmployee  emit the §11 employee WhatsApp notification. Disabled
-     *      for WhatsApp-command-driven transitions that already reply inline.
+     *                                for WhatsApp-command-driven transitions that already reply inline.
      */
     public function changeStatus(
         Ticket $ticket,

@@ -7,6 +7,7 @@ use App\Models\Employee;
 use App\Models\Ticket;
 use App\Models\TicketProgressReport;
 use App\Models\TicketStatusHistory;
+use App\Models\User;
 use App\Services\TicketService;
 
 function makeTicket(): Ticket
@@ -87,7 +88,7 @@ it('finalizes the draft report with technician-supplied fields', function () {
     $ticket = $service->changeStatus(makeTicket(), TicketStatus::InProgress);
     $report = TicketProgressReport::where('ticket_id', $ticket->id)->sole();
 
-    $finalized = $service->finalizeReport($report, \App\Models\User::factory()->technician()->create(), [
+    $finalized = $service->finalizeReport($report, User::factory()->technician()->create(), [
         'work_performed' => 'Replaced toner cartridge.',
         'findings' => 'Cartridge was empty.',
         'next_steps' => 'Monitor supply levels.',

@@ -1,8 +1,10 @@
 <?php
 
+use App\Enums\TicketCategory;
 use App\Models\Company;
 use App\Models\Ticket;
 use App\Models\User;
+use Illuminate\Support\Facades\RateLimiter;
 use Livewire\Volt\Volt;
 
 /*
@@ -15,8 +17,8 @@ beforeEach(function () {
     // The per-IP throttle is cache-backed. Each submit increments it even when
     // validation later fails, so clear it (both the loopback and empty-IP keys)
     // to keep the tests from leaking counts into one another.
-    Illuminate\Support\Facades\RateLimiter::clear('public-ticket:127.0.0.1');
-    Illuminate\Support\Facades\RateLimiter::clear('public-ticket:');
+    RateLimiter::clear('public-ticket:127.0.0.1');
+    RateLimiter::clear('public-ticket:');
 });
 
 it('lets a visitor load the public form without logging in', function () {
@@ -87,7 +89,7 @@ it('stores the chosen problem category and the optional AnyDesk ID', function ()
 
     $ticket = Ticket::sole();
 
-    expect($ticket->category)->toBe(\App\Enums\TicketCategory::Printer)
+    expect($ticket->category)->toBe(TicketCategory::Printer)
         // Trimmed on the way in, never blank-padded.
         ->and($ticket->anydesk_id)->toBe('123 456 789');
 });
