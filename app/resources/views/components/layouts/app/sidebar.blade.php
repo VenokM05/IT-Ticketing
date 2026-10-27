@@ -85,6 +85,7 @@
                         <flux:menu.item href="{{ route('settings.canned-responses') }}" icon="clipboard-document-list" wire:navigate>Canned Responses</flux:menu.item>
                         <flux:menu.item href="{{ route('settings.categories') }}" icon="tag" wire:navigate>Categories</flux:menu.item>
                         <flux:menu.item href="{{ route('settings.priorities') }}" icon="signal" wire:navigate>Priorities</flux:menu.item>
+                        <flux:menu.item href="{{ route('settings.knowledge-base') }}" icon="book-open" wire:navigate>Knowledge Base</flux:menu.item>
                     @endif
 
                     <flux:menu.separator />

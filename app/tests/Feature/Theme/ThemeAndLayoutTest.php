@@ -44,7 +44,7 @@ it('renders every primary route over http for an admin', function (string $path)
     '/dashboard', '/tickets', '/tickets/create', '/notifications',
     '/employees', '/companies', '/staff', '/relinks', '/reports', '/broadcast', '/audit',
     '/settings/profile', '/settings/appearance', '/settings/whatsapp', '/settings/canned-responses',
-    '/settings/categories', '/settings/priorities',
+    '/settings/categories', '/settings/priorities', '/settings/knowledge-base',
 ]);
 
 it('ships the design-token layer in the compiled css', function () {

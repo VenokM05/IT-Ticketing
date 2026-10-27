@@ -3,6 +3,8 @@
 use App\Enums\TicketStatus;
 use App\Models\Category;
 use App\Models\Company;
+use App\Models\EmployeeToken;
+use App\Models\KbArticle;
 use App\Services\TicketService;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Validation\Rule;
@@ -34,6 +36,11 @@ new #[Layout('components.layouts.auth')] #[Title('Submit a Ticket')] class exten
     public string $website = '';
 
     public ?string $ticketNumber = null;
+
+    // Self-service tracking link (Phase 10) + the category suggestions were keyed on.
+    public ?string $trackUrl = null;
+
+    public ?string $submittedCategory = null;
 
     public function submit(): void
     {
@@ -99,6 +106,11 @@ new #[Layout('components.layouts.auth')] #[Title('Submit a Ticket')] class exten
 
         $this->ticketNumber = $ticket->ticket_number;
 
+        // Hand the requester a no-login tracking link and remember their chosen
+        // category so the confirmation screen can show matching self-help articles.
+        $this->trackUrl = route('portal.ticket', EmployeeToken::issue($ticket)->token);
+        $this->submittedCategory = $this->category;
+
         $this->reset([
             'name', 'company', 'department', 'position', 'contact',
             'subject', 'description', 'website', 'anydeskId',
@@ -108,7 +120,7 @@ new #[Layout('components.layouts.auth')] #[Title('Submit a Ticket')] class exten
 
     public function again(): void
     {
-        $this->reset('ticketNumber');
+        $this->reset(['ticketNumber', 'trackUrl', 'submittedCategory']);
     }
 
     public function with(): array
@@ -117,6 +129,11 @@ new #[Layout('components.layouts.auth')] #[Title('Submit a Ticket')] class exten
             // Suggestions only — a free-text entry that matches nothing is still accepted.
             'companyNames' => Company::query()->active()->orderBy('name')->pluck('name'),
             'categories' => Category::query()->active()->ordered()->get(),
+            // Knowledge-base self-help: react to the live selection, or to the
+            // category the submitted request was filed under on the receipt.
+            'suggestions' => KbArticle::suggestionsFor(
+                $this->ticketNumber ? $this->submittedCategory : $this->category,
+            ),
         ];
     }
 }; ?>
@@ -131,6 +148,20 @@ new #[Layout('components.layouts.auth')] #[Title('Submit a Ticket')] class exten
             <p class="mt-1 text-sm text-green-700 dark:text-green-300">Your ticket number is</p>
             <p class="mt-1 text-2xl font-bold tracking-wide text-green-800 dark:text-green-100">{{ $ticketNumber }}</p>
             <p class="mt-3 text-sm text-green-700/80 dark:text-green-300/80">Please save this number — it is how IT will reference your request. Quote it if you follow up.</p>
+            @if ($trackUrl)
+                <a href="{{ $trackUrl }}" class="mt-3 inline-block text-sm font-semibold text-green-800 underline dark:text-green-100">Track this request and add updates anytime →</a>
+                <p class="mt-1 text-xs text-green-700/70 dark:text-green-300/70">Keep this link — it is the only way to reopen this page without an account.</p>
+            @endif
+            @if ($suggestions->isNotEmpty())
+                <div class="mt-4 text-left">
+                    <p class="text-xs font-semibold uppercase tracking-wide text-green-700/80 dark:text-green-300/80">Meanwhile, try this</p>
+                    <ul class="mt-1 space-y-1">
+                        @foreach ($suggestions as $article)
+                            <li class="text-sm text-green-800 dark:text-green-200">• {{ $article->title }}</li>
+                        @endforeach
+                    </ul>
+                </div>
+            @endif
             <flux:button wire:click="again" variant="subtle" class="mt-4">Submit another request</flux:button>
         </div>
     @else
@@ -170,6 +201,21 @@ new #[Layout('components.layouts.auth')] #[Title('Submit a Ticket')] class exten
 
                 <flux:input wire:model="anydeskId" label="AnyDesk ID (optional)" placeholder="e.g. 123 456 789 — needed only for remote assistance" />
             </div>
+
+            {{-- Knowledge-base self-help that matches the chosen category (Phase 10). --}}
+            @if ($suggestions->isNotEmpty())
+                <div class="rounded-lg border border-border bg-surface-muted/40 p-3">
+                    <p class="text-xs font-semibold uppercase tracking-wide text-fg-subtle">Fixes for “{{ $categories->firstWhere('key', $category)?->label() ?? 'this' }}”</p>
+                    <ul class="mt-2 space-y-1">
+                        @foreach ($suggestions as $article)
+                            <li class="text-sm">
+                                <span class="font-medium">{{ $article->title }}</span>
+                                <span class="block text-xs text-fg-muted">{{ \Illuminate\Support\Str::limit($article->body, 140) }}</span>
+                            </li>
+                        @endforeach
+                    </ul>
+                </div>
+            @endif
 
             <flux:textarea wire:model="description" label="Description" rows="5" placeholder="What is happening? When did it start? What is affected?" />
 

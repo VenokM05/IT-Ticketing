@@ -14,6 +14,13 @@ Volt::route('submit-ticket', 'public.submit-ticket')
     ->middleware('throttle:20,1')
     ->name('public.submit-ticket');
 
+// Tokenized self-service lookup (Phase 10): the magic link a public requester is
+// handed at intake. The opaque token is the only credential; throttled to blunt
+// link guessing. An unknown/expired token 404s.
+Volt::route('ticket/{token}', 'portal.ticket')
+    ->middleware('throttle:60,1')
+    ->name('portal.ticket');
+
 Route::middleware(['auth', 'verified'])->group(function () {
     Volt::route('dashboard', 'dashboard')->name('dashboard');
     Volt::route('notifications', 'notifications')->name('notifications');
@@ -64,6 +71,9 @@ Route::middleware(['auth'])->group(function () {
     // DB-managed classification lookups — administrator only (enforced in the page).
     Volt::route('settings/categories', 'settings.categories')->name('settings.categories');
     Volt::route('settings/priorities', 'settings.priorities')->name('settings.priorities');
+
+    // Knowledge base self-help articles — administrator only (enforced in the page).
+    Volt::route('settings/knowledge-base', 'settings.knowledge-base')->name('settings.knowledge-base');
 });
 
 require __DIR__.'/auth.php';

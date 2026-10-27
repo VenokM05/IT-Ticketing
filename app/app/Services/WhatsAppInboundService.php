@@ -7,6 +7,7 @@ use App\Enums\MessageDirection;
 use App\Enums\MessageType;
 use App\Enums\TicketStatus;
 use App\Models\Employee;
+use App\Models\KbArticle;
 use App\Models\Ticket;
 use App\Models\TicketMessage;
 use App\Support\MessageGrammar;
@@ -220,10 +221,18 @@ class WhatsAppInboundService
 
         $this->storeInbound($ticket, $message, $rawBody, $type);
 
+        // Point the requester at a couple of published self-help articles where one
+        // matches the intake category — deflect easy fixes without a technician turn.
+        $session = "Ticket {$ticket->ticket_number} created: \"{$subject}\". Our IT team will follow up here.";
+        $help = KbArticle::suggestionsFor($ticket->category?->key)->pluck('title')->take(2)->all();
+        if ($help !== []) {
+            $session .= ' Meanwhile, you could try: '.implode('; ', $help).'.';
+        }
+
         $this->outbound->notifyTicket(
             $ticket,
             $employee,
-            "Ticket {$ticket->ticket_number} created: \"{$subject}\". Our IT team will follow up here.",
+            $session,
             'ticket_acknowledgment',
             [$ticket->ticket_number, $subject],
         );

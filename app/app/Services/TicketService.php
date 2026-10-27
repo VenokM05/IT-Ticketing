@@ -2,6 +2,9 @@
 
 namespace App\Services;
 
+use App\Enums\MessageChannel;
+use App\Enums\MessageDirection;
+use App\Enums\MessageType;
 use App\Enums\ReportStatus;
 use App\Enums\ReportType;
 use App\Enums\TicketStatus;
@@ -11,6 +14,7 @@ use App\Models\Category;
 use App\Models\Employee;
 use App\Models\Priority;
 use App\Models\Ticket;
+use App\Models\TicketMessage;
 use App\Models\TicketProgressReport;
 use App\Models\TicketProgressUpdate;
 use App\Models\TicketStatusHistory;
@@ -175,6 +179,25 @@ class TicketService
         ]);
 
         return $ticket->refresh();
+    }
+
+    /**
+     * Post a follow-up comment from a self-service requester via their tracking
+     * link (PRD Phase 10, Rec #13). It lands as an inbound portal message — no
+     * enrolled user, so the author stays null and the requester's claim on the
+     * ticket is unchanged. Technicians/admins see it in the same timeline.
+     */
+    public function addRequesterComment(Ticket $ticket, string $body): TicketMessage
+    {
+        return TicketMessage::create([
+            'ticket_id' => $ticket->id,
+            'user_id' => null,
+            'direction' => MessageDirection::Inbound,
+            'channel' => MessageChannel::Portal,
+            'message_type' => MessageType::Text,
+            'body' => trim($body),
+            'is_internal' => false,
+        ]);
     }
 
     /**
