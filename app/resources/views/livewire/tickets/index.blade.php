@@ -142,6 +142,7 @@ new #[Layout('components.layouts.app')] #[Title('Tickets')] class extends Compon
                         <th class="px-4 py-2 font-medium text-fg-subtle">Category</th>
                         <th class="px-4 py-2 font-medium text-fg-subtle">Priority</th>
                         <th class="px-4 py-2 font-medium text-fg-subtle">Status</th>
+                        <th class="px-4 py-2 font-medium text-fg-subtle">SLA</th>
                         <th class="px-4 py-2 font-medium text-fg-subtle">Technician</th>
                         <th class="px-4 py-2 font-medium text-fg-subtle">Created</th>
                     </tr>
@@ -160,12 +161,20 @@ new #[Layout('components.layouts.app')] #[Title('Tickets')] class extends Compon
                             <td class="px-4 py-2">{{ $ticket->category->label() }}</td>
                             <td class="px-4 py-2"><flux:badge :color="match ($ticket->priority) { \App\Enums\TicketPriority::Critical => 'red', \App\Enums\TicketPriority::High => 'orange', default => 'zinc' }" size="sm">{{ $ticket->priority->label() }}</flux:badge></td>
                             <td class="px-4 py-2"><flux:badge :color="match ($ticket->status) { \App\Enums\TicketStatus::Closed => 'zinc', \App\Enums\TicketStatus::Resolved => 'green', \App\Enums\TicketStatus::InProgress => 'blue', \App\Enums\TicketStatus::Pending => 'amber', default => 'purple' }" size="sm">{{ $ticket->status->label() }}</flux:badge></td>
+                            <td class="px-4 py-2">
+                                @php($sla = $ticket->slaSummaryState())
+                                @if ($sla === null)
+                                    <span class="text-fg-subtle">—</span>
+                                @else
+                                    <flux:badge :color="match ($sla) { 'breached' => 'red', 'at_risk' => 'amber', default => 'green' }" size="sm">{{ $sla === 'at_risk' ? 'At risk' : ucfirst($sla) }}</flux:badge>
+                                @endif
+                            </td>
                             <td class="px-4 py-2">{{ $ticket->assignee?->name ?? 'Unassigned' }}</td>
                             <td class="px-4 py-2 whitespace-nowrap text-fg-muted">{{ $ticket->created_at->format('Y-m-d H:i') }}</td>
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="8" class="px-4 py-8 text-center text-fg-muted">No tickets match your filters.</td>
+                            <td colspan="9" class="px-4 py-8 text-center text-fg-muted">No tickets match your filters.</td>
                         </tr>
                     @endforelse
                 </tbody>

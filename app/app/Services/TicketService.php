@@ -4,6 +4,8 @@ namespace App\Services;
 
 use App\Enums\ReportStatus;
 use App\Enums\ReportType;
+use App\Enums\TicketCategory;
+use App\Enums\TicketPriority;
 use App\Enums\TicketStatus;
 use App\Enums\UserRole;
 use App\Exceptions\InvalidStatusTransition;
@@ -70,6 +72,8 @@ class TicketService
                 'status' => $status,
             ]);
 
+            $this->applySla($ticket);
+
             $this->recordHistory(
                 $ticket,
                 null,
@@ -86,6 +90,51 @@ class TicketService
 
             return $ticket;
         });
+    }
+
+    /**
+     * Stamp (or refresh) the SLA response/resolve deadlines for a ticket from its
+     * priority and creation instant. Tickets whose priority has no configured
+     * window keep null deadlines. Called on intake and whenever priority changes.
+     */
+    public function applySla(Ticket $ticket): Ticket
+    {
+        $window = config('tickets.sla')[$ticket->priority?->value] ?? null;
+
+        $base = $ticket->created_at ?? now();
+
+        $ticket->response_due_at = $window === null
+            ? null
+            : $base->copy()->addHours($window['response']);
+        $ticket->resolve_due_at = $window === null
+            ? null
+            : $base->copy()->addHours($window['resolve']);
+        $ticket->save();
+
+        return $ticket;
+    }
+
+    /**
+     * Change a ticket's category/priority (detail screen) and, when the priority
+     * moved, recompute its SLA deadlines so the badges stay truthful.
+     */
+    public function updateClassification(
+        Ticket $ticket,
+        TicketPriority $priority,
+        TicketCategory $category,
+    ): Ticket {
+        $priorityChanged = $ticket->priority !== $priority;
+
+        $ticket->update([
+            'priority' => $priority,
+            'category' => $category,
+        ]);
+
+        if ($priorityChanged) {
+            $this->applySla($ticket->refresh());
+        }
+
+        return $ticket;
     }
 
     /**

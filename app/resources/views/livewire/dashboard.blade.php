@@ -57,6 +57,29 @@ new #[Layout('components.layouts.app')] #[Title('Dashboard')] class extends Comp
     }
 
     /**
+     * Open tickets whose response or resolve SLA deadline has passed without the
+     * milestone being met. Scopes to the technician's own queue for non-admins.
+     */
+    public function slaBreachedCount(): int
+    {
+        $user = auth()->user();
+        $now = now();
+
+        return Ticket::query()
+            ->when(! $user->isAdmin(), fn ($q) => $q->where('assigned_to', $user->id))
+            ->whereNotIn('status', [TicketStatus::Resolved->value, TicketStatus::Closed->value])
+            ->where(function ($q) use ($now) {
+                $q->where(fn ($r) => $r->whereNotNull('response_due_at')
+                    ->whereNull('first_response_at')
+                    ->where('response_due_at', '<', $now))
+                    ->orWhere(fn ($r) => $r->whereNotNull('resolve_due_at')
+                        ->whereNull('resolved_at')
+                        ->where('resolve_due_at', '<', $now));
+            })
+            ->count();
+    }
+
+    /**
      * This week's volume per company — the Friday monitoring view at a glance.
      *
      * @return list<array{company: string, created: int, open: int}>
@@ -154,7 +177,7 @@ new #[Layout('components.layouts.app')] #[Title('Dashboard')] class extends Comp
 
     {{-- Company monitoring strip: pending workload + this week per company (process.md 5 & 6) --}}
     @if (auth()->user()->isAdmin())
-        <div class="grid gap-4 lg:grid-cols-3">
+        <div class="grid gap-4 lg:grid-cols-4">
             <a
                 href="{{ route('tickets', ['status' => 'pending']) }}"
                 wire:navigate
@@ -168,6 +191,19 @@ new #[Layout('components.layouts.app')] #[Title('Dashboard')] class extends Comp
                 <div class="mt-1 text-xs text-fg-subtle">
                     Daily alert fires at {{ config('alerts.pending.at') }} {{ config('alerts.timezone') }}
                 </div>
+            </a>
+
+            <a
+                href="{{ route('tickets') }}"
+                wire:navigate
+                class="card p-5 transition hover:shadow-sm {{ $this->slaBreachedCount() > 0 ? '!border-red-300 bg-red-50/70 dark:!border-red-800 dark:bg-red-950/30' : '' }}"
+            >
+                <div class="flex items-center gap-2 text-sm font-medium text-fg-muted">
+                    <flux:icon.clock class="size-4 {{ $this->slaBreachedCount() > 0 ? 'text-red-600 dark:text-red-400' : '' }}" />
+                    SLA breached
+                </div>
+                <div class="mt-2 text-3xl font-semibold tabular-nums">{{ $this->slaBreachedCount() }}</div>
+                <div class="mt-1 text-xs text-fg-subtle">Open tickets past their response/resolve target</div>
             </a>
 
             <div class="card p-5 lg:col-span-2">

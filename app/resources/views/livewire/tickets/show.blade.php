@@ -126,10 +126,11 @@ new #[Layout('components.layouts.app')] #[Title('Ticket')] class extends Compone
             'classCategory' => ['required', 'string'],
         ]);
 
-        $this->ticket->update([
-            'priority' => TicketPriority::from($validated['classPriority']),
-            'category' => TicketCategory::from($validated['classCategory']),
-        ]);
+        app(TicketService::class)->updateClassification(
+            $this->ticket,
+            TicketPriority::from($validated['classPriority']),
+            TicketCategory::from($validated['classCategory']),
+        );
 
         $this->refreshTicket();
         session()->flash('success', 'Ticket updated');
@@ -410,6 +411,36 @@ new #[Layout('components.layouts.app')] #[Title('Ticket')] class extends Compone
                     <div class="flex justify-between"><dt class="text-fg-muted">Resolved</dt><dd>{{ $ticket->resolved_at?->format('Y-m-d H:i') ?? '—' }}</dd></div>
                     <div class="flex justify-between"><dt class="text-fg-muted">Closed</dt><dd>{{ $ticket->closed_at?->format('Y-m-d H:i') ?? '—' }}</dd></div>
                 </dl>
+            </div>
+
+            <div class="card p-4">
+                <h2 class="text-sm font-semibold">SLA</h2>
+                @php($responseState = $ticket->slaResponseState())
+                @php($resolveState = $ticket->slaResolveState())
+                @if ($responseState === null && $resolveState === null)
+                    <p class="mt-2 text-sm text-fg-muted">No SLA tracked for this priority.</p>
+                @else
+                    <dl class="mt-2 space-y-2 text-sm">
+                        <div class="flex items-center justify-between gap-2">
+                            <dt class="text-fg-muted">First response</dt>
+                            <dd class="flex items-center gap-2">
+                                <span class="text-fg-muted">{{ $ticket->response_due_at?->format('Y-m-d H:i') ?? '—' }}</span>
+                                @if ($responseState !== null)
+                                    <flux:badge :color="match ($responseState) { 'breached' => 'red', 'at_risk' => 'amber', default => 'green' }" size="sm">{{ $responseState === 'at_risk' ? 'At risk' : ucfirst($responseState) }}</flux:badge>
+                                @endif
+                            </dd>
+                        </div>
+                        <div class="flex items-center justify-between gap-2">
+                            <dt class="text-fg-muted">Resolution</dt>
+                            <dd class="flex items-center gap-2">
+                                <span class="text-fg-muted">{{ $ticket->resolve_due_at?->format('Y-m-d H:i') ?? '—' }}</span>
+                                @if ($resolveState !== null)
+                                    <flux:badge :color="match ($resolveState) { 'breached' => 'red', 'at_risk' => 'amber', default => 'green' }" size="sm">{{ $resolveState === 'at_risk' ? 'At risk' : ucfirst($resolveState) }}</flux:badge>
+                                @endif
+                            </dd>
+                        </div>
+                    </dl>
+                @endif
             </div>
 
             @if ($canUpdate)
