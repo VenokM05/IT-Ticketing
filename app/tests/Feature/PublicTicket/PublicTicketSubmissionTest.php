@@ -73,6 +73,50 @@ it('requires the core requester fields', function () {
     expect(Ticket::count())->toBe(0);
 });
 
+it('stores the chosen problem category and the optional AnyDesk ID', function () {
+    Volt::test('public.submit-ticket')
+        ->set('name', 'Ana')
+        ->set('company', 'Initech')
+        ->set('contact', 'ana@initech.test')
+        ->set('subject', 'Cannot print')
+        ->set('description', 'Printer offline since this morning.')
+        ->set('category', 'printer')
+        ->set('anydeskId', ' 123 456 789 ')
+        ->call('submit')
+        ->assertHasNoErrors();
+
+    $ticket = Ticket::sole();
+
+    expect($ticket->category)->toBe(\App\Enums\TicketCategory::Printer)
+        // Trimmed on the way in, never blank-padded.
+        ->and($ticket->anydesk_id)->toBe('123 456 789');
+});
+
+it('treats the AnyDesk ID as optional and rejects unknown categories', function () {
+    Volt::test('public.submit-ticket')
+        ->set('name', 'Ben')
+        ->set('company', 'Initech')
+        ->set('contact', 'ben@initech.test')
+        ->set('subject', 'Outlook password')
+        ->set('description', 'Locked out of my mailbox.')
+        ->set('category', 'vpn-tunnel')      // not a TicketCategory value
+        ->call('submit')
+        ->assertHasErrors(['category']);
+
+    expect(Ticket::count())->toBe(0);
+
+    Volt::test('public.submit-ticket')
+        ->set('name', 'Ben')
+        ->set('company', 'Initech')
+        ->set('contact', 'ben@initech.test')
+        ->set('subject', 'Outlook password')
+        ->set('description', 'Locked out of my mailbox.')
+        ->call('submit')
+        ->assertHasNoErrors();
+
+    expect(Ticket::sole()->anydesk_id)->toBeNull();
+});
+
 it('rate limits public submissions per network', function () {
     for ($i = 0; $i < 8; $i++) {
         Volt::test('public.submit-ticket')

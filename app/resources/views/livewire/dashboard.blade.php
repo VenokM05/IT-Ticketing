@@ -88,7 +88,7 @@ new #[Layout('components.layouts.app')] #[Title('Dashboard')] class extends Comp
         $user = auth()->user();
 
         return Ticket::query()
-            ->with(['assignee', 'employee'])
+            ->with(['assignee', 'employee.department', 'company'])
             ->when(
                 ! $user->isAdmin(),
                 fn ($q) => $q->where('assigned_to', $user->id)
@@ -103,7 +103,10 @@ new #[Layout('components.layouts.app')] #[Title('Dashboard')] class extends Comp
                 'status' => $ticket->status,
                 'priority' => $ticket->priority,
                 'assignee' => $ticket->assignee?->name,
-                'employee' => $ticket->employee?->name,
+                // Unified requester/company/department: enrollment first, public snapshot fallback.
+                'requester' => $ticket->requesterName(),
+                'company' => $ticket->companyLabel(),
+                'department' => $ticket->requesterDepartment(),
                 'created_at' => $ticket->created_at,
             ])
             ->all();
@@ -207,6 +210,8 @@ new #[Layout('components.layouts.app')] #[Title('Dashboard')] class extends Comp
                     <tr>
                         <th class="px-5 py-2.5 font-medium text-fg-subtle">Ticket</th>
                         <th class="px-5 py-2.5 font-medium text-fg-subtle">Requester</th>
+                        <th class="px-5 py-2.5 font-medium text-fg-subtle">Company</th>
+                        <th class="px-5 py-2.5 font-medium text-fg-subtle">Department</th>
                         <th class="px-5 py-2.5 font-medium text-fg-subtle">Priority</th>
                         <th class="px-5 py-2.5 font-medium text-fg-subtle">Status</th>
                         <th class="px-5 py-2.5 font-medium text-fg-subtle">Technician</th>
@@ -222,7 +227,9 @@ new #[Layout('components.layouts.app')] #[Title('Dashboard')] class extends Comp
                                 </a>
                                 <div class="text-fg-muted">{{ $ticket['subject'] }}</div>
                             </td>
-                            <td class="px-5 py-3">{{ $ticket['employee'] ?? '—' }}</td>
+                            <td class="px-5 py-3">{{ $ticket['requester'] ?? '—' }}</td>
+                            <td class="px-5 py-3 text-fg-muted">{{ $ticket['company'] }}</td>
+                            <td class="px-5 py-3 text-fg-muted">{{ $ticket['department'] ?? '—' }}</td>
                             <td class="px-5 py-3"><flux:badge :color="$ticket['priority']->value === 'critical' ? 'red' : ($ticket['priority']->value === 'high' ? 'orange' : 'zinc')" size="sm" class="capitalize">{{ $ticket['priority']->label() }}</flux:badge></td>
                             <td class="px-5 py-3"><flux:badge :color="match ($ticket['status']) { \App\Enums\TicketStatus::Closed => 'zinc', \App\Enums\TicketStatus::Resolved => 'green', \App\Enums\TicketStatus::InProgress => 'blue', \App\Enums\TicketStatus::Pending => 'amber', default => 'purple' }" size="sm">{{ $ticket['status']->label() }}</flux:badge></td>
                             <td class="px-5 py-3">{{ $ticket['assignee'] ?? 'Unassigned' }}</td>
@@ -230,7 +237,7 @@ new #[Layout('components.layouts.app')] #[Title('Dashboard')] class extends Comp
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="6" class="px-5 py-10 text-center text-fg-subtle">No tickets yet.</td>
+                            <td colspan="8" class="px-5 py-10 text-center text-fg-subtle">No tickets yet.</td>
                         </tr>
                     @endforelse
                 </tbody>

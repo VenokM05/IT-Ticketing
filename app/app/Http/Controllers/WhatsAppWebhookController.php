@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Services\WhatsAppSettings;
 use App\Services\WebhookEventRecorder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -26,7 +27,7 @@ class WhatsAppWebhookController extends Controller
         // Laravel converts "." to "_" in request input keys, so Meta's hub.*
         // query params arrive here as hub_mode / hub_verify_token / hub_challenge.
         $query = $request->query();
-        $expected = (string) config('services.whatsapp.verify_token');
+        $expected = (string) WhatsAppSettings::credential('verify_token');
         $token = (string) ($query['hub_verify_token'] ?? '');
 
         if (($query['hub_mode'] ?? null) === 'subscribe'
@@ -63,7 +64,7 @@ class WhatsAppWebhookController extends Controller
 
     private function hasValidSignature(string $raw, string $signature): bool
     {
-        $secret = (string) config('services.whatsapp.app_secret');
+        $secret = (string) WhatsAppSettings::credential('app_secret');
 
         if ($secret === '') {
             // No secret configured — reject rather than accept unverified traffic.

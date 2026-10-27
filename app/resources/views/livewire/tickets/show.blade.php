@@ -265,6 +265,9 @@ new #[Layout('components.layouts.app')] #[Title('Ticket')] class extends Compone
                     <div><dt class="text-fg-muted">Contact</dt><dd>{{ $ticket->requesterContact() ?? '—' }}</dd></div>
                     <div><dt class="text-fg-muted">Department</dt><dd>{{ $ticket->requesterDepartment() ?? '—' }}</dd></div>
                     <div><dt class="text-fg-muted">Position</dt><dd>{{ $ticket->requesterPosition() ?? '—' }}</dd></div>
+                    @if ($ticket->anydesk_id)
+                        <div><dt class="text-fg-muted">AnyDesk ID</dt><dd class="font-mono">{{ $ticket->anydesk_id }}</dd></div>
+                    @endif
                     <div><dt class="text-fg-muted">Source</dt><dd>{{ $ticket->employee ? 'Enrolled' : 'Web request' }}</dd></div>
                     <div><dt class="text-fg-muted">Created</dt><dd>{{ $ticket->created_at->format('Y-m-d H:i') }}</dd></div>
                 </dl>

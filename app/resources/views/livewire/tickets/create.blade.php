@@ -25,6 +25,7 @@ new #[Layout('components.layouts.app')] #[Title('Submit Ticket')] class extends 
     public string $category = TicketCategory::General->value;
     public string $priority = TicketPriority::Medium->value;
     public string $technicianId = '';
+    public string $anydeskId = '';
 
     public function mount(): void
     {
@@ -43,6 +44,7 @@ new #[Layout('components.layouts.app')] #[Title('Submit Ticket')] class extends 
                 'category' => ['required', 'string', 'in:'.implode(',', array_column(TicketCategory::cases(), 'value'))],
                 'priority' => ['required', 'string', 'in:'.implode(',', array_column(TicketPriority::cases(), 'value'))],
                 'technicianId' => ['nullable', 'integer', 'exists:users,id'],
+                'anydeskId' => ['nullable', 'string', 'max:60'],
             ],
             [
                 'employeeId.required' => 'Choose the employee this ticket is for.',
@@ -59,6 +61,7 @@ new #[Layout('components.layouts.app')] #[Title('Submit Ticket')] class extends 
             'priority' => TicketPriority::from($this->priority),
             'status' => $this->technicianId !== '' ? TicketStatus::Assigned : TicketStatus::New,
             'assigned_to' => $this->technicianId !== '' ? (int) $this->technicianId : null,
+            'anydesk_id' => $this->anydeskId !== '' ? trim($this->anydeskId) : null,
         ], auth()->user());
 
         return redirect()->route('tickets.show', $ticket)
@@ -110,6 +113,8 @@ new #[Layout('components.layouts.app')] #[Title('Submit Ticket')] class extends 
         @endif
 
         <flux:input wire:model="subject" label="Subject" placeholder="Short summary of the issue" />
+
+        <flux:input wire:model="anydeskId" label="AnyDesk ID (optional)" placeholder="Remote-assistance handle, if the user provided one" />
 
         <flux:textarea wire:model="description" label="Description" rows="5" placeholder="What is happening? Steps to reproduce, impact, etc." />
 

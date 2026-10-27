@@ -119,6 +119,7 @@ class WhatsAppCloudApi
 
     protected function config(string $key): mixed
     {
-        return config('services.whatsapp.'.$key);
+        // Admin-set credentials (Settings › WhatsApp) win over env-backed config.
+        return WhatsAppSettings::credential($key);
     }
 }

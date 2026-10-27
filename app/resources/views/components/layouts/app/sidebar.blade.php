@@ -33,71 +33,66 @@
                     </flux:navlist.group>
                 @endif
             </flux:navlist>
-
-            <flux:spacer />
-
-            {{-- Utility row: theme + notifications --}}
-            <div class="flex items-center gap-1 border-t border-border py-3">
-                <x-theme-toggle />
-                <div class="scale-90 origin-left"><livewire:notification-bell /></div>
-                <flux:spacer />
-
-                {{-- Desktop User Menu --}}
-                <flux:dropdown position="bottom" align="start">
-                    <flux:profile
-                        :name="auth()->user()->name"
-                        :initials="auth()->user()->initials()"
-                        icon-trailing="chevrons-up-down"
-                    />
-
-                    <flux:menu class="w-[240px]">
-                        <flux:menu.radio.group>
-                            <div class="p-0 text-sm font-normal">
-                                <div class="flex items-center gap-2 px-1 py-1.5 text-left text-sm">
-                                    <span class="relative flex h-9 w-9 shrink-0 overflow-hidden rounded-lg">
-                                        <span class="flex h-full w-full items-center justify-center rounded-lg bg-accent text-accent-foreground text-sm font-semibold">
-                                            {{ auth()->user()->initials() }}
-                                        </span>
-                                    </span>
-                                    <div class="grid flex-1 text-left text-sm leading-tight">
-                                        <span class="truncate font-semibold">{{ auth()->user()->name }}</span>
-                                        <span class="truncate text-xs text-fg-subtle">{{ auth()->user()->email }}</span>
-                                    </div>
-                                </div>
-                            </div>
-                        </flux:menu.radio.group>
-
-                        <flux:menu.separator />
-
-                        <flux:menu.item href="/settings/profile" icon="cog" wire:navigate>Settings</flux:menu.item>
-                        <flux:menu.item href="/settings/appearance" icon="sun" wire:navigate>Appearance</flux:menu.item>
-
-                        <flux:menu.separator />
-
-                        <form method="POST" action="{{ route('logout') }}" class="w-full">
-                            @csrf
-                            <flux:menu.item as="button" type="submit" icon="arrow-right-start-on-rectangle" class="w-full">
-                                {{ __('Log Out') }}
-                            </flux:menu.item>
-                        </form>
-                    </flux:menu>
-                </flux:dropdown>
-            </div>
         </flux:sidebar>
 
-        {{-- Mobile top bar --}}
-        <flux:header class="lg:hidden border-b border-border bg-surface">
-            <flux:sidebar.toggle icon="bars-2" inset="left" />
+        {{-- Global top bar: Notifications, Account, Theme toggle (always visible, right-aligned) --}}
+        <flux:header class="border-b border-border bg-surface">
+            <flux:sidebar.toggle icon="bars-2" inset="left" class="lg:hidden" />
 
-            <a href="{{ route('dashboard') }}" class="ml-1 flex items-center gap-2" wire:navigate>
+            <a href="{{ route('dashboard') }}" class="ml-1 flex items-center gap-2 lg:hidden" wire:navigate>
                 <x-app-logo-icon class="size-7 text-accent" />
                 <span class="font-semibold">{{ config('app.name', 'IT Ticketing') }}</span>
             </a>
 
             <flux:spacer />
 
-            <livewire:notification-bell />
-            <x-theme-toggle class="ml-1" />
+            {{-- Right cluster, ordered right-to-left: Notifications, Account/Profile, Theme toggle --}}
+            <x-theme-toggle />
+
+            <flux:dropdown position="bottom" align="end" class="ml-1">
+                <flux:profile
+                    :name="auth()->user()->name"
+                    :initials="auth()->user()->initials()"
+                    icon-trailing="chevrons-up-down"
+                />
+
+                <flux:menu class="w-[240px]">
+                    <flux:menu.radio.group>
+                        <div class="p-0 text-sm font-normal">
+                            <div class="flex items-center gap-2 px-1 py-1.5 text-left text-sm">
+                                <span class="relative flex h-9 w-9 shrink-0 overflow-hidden rounded-lg">
+                                    <span class="flex h-full w-full items-center justify-center rounded-lg bg-accent text-accent-foreground text-sm font-semibold">
+                                        {{ auth()->user()->initials() }}
+                                    </span>
+                                </span>
+                                <div class="grid flex-1 text-left text-sm leading-tight">
+                                    <span class="truncate font-semibold">{{ auth()->user()->name }}</span>
+                                    <span class="truncate text-xs text-fg-subtle">{{ auth()->user()->email }}</span>
+                                </div>
+                            </div>
+                        </div>
+                    </flux:menu.radio.group>
+
+                    <flux:menu.separator />
+
+                    <flux:menu.item href="/settings/profile" icon="cog" wire:navigate>Settings</flux:menu.item>
+                    <flux:menu.item href="/settings/appearance" icon="sun" wire:navigate>Appearance</flux:menu.item>
+                    @if (auth()->user()->isAdmin())
+                        <flux:menu.item href="{{ route('settings.whatsapp') }}" icon="chat-bubble-left-right" wire:navigate>WhatsApp</flux:menu.item>
+                    @endif
+
+                    <flux:menu.separator />
+
+                    <form method="POST" action="{{ route('logout') }}" class="w-full">
+                        @csrf
+                        <flux:menu.item as="button" type="submit" icon="arrow-right-start-on-rectangle" class="w-full">
+                            {{ __('Log Out') }}
+                        </flux:menu.item>
+                    </form>
+                </flux:menu>
+            </flux:dropdown>
+
+            <div class="ml-1"><livewire:notification-bell /></div>
         </flux:header>
 
         {{ $slot }}

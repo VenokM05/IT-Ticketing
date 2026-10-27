@@ -35,6 +35,8 @@ class Ticket extends Model
         'requester_company',
         'requester_department',
         'requester_position',
+        // Optional remote-assistance handle supplied at intake (web forms).
+        'anydesk_id',
     ];
 
     protected function casts(): array

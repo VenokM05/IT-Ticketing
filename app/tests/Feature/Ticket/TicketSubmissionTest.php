@@ -72,3 +72,20 @@ it('rejects an empty submission with validation errors', function () {
 
     expect(Ticket::count())->toBe(0);
 });
+
+it('stores the optional AnyDesk ID captured on the admin form', function () {
+    $admin = User::factory()->admin()->create();
+    $employee = Employee::factory()->create();
+    $this->actingAs($admin);
+
+    Volt::test('tickets.create')
+        ->set('employeeId', (string) $employee->id)
+        ->set('subject', 'Team cannot open shared drive')
+        ->set('description', 'Mapping fails on both office PCs.')
+        ->set('anydeskId', '987 654 321')
+        ->call('submit')
+        ->assertHasNoErrors()
+        ->assertRedirect();
+
+    expect(Ticket::sole()->anydesk_id)->toBe('987 654 321');
+});

@@ -28,6 +28,8 @@ new #[Layout('components.layouts.auth')] #[Title('Submit a Ticket')] class exten
     public string $subject = '';
     public string $description = '';
     public string $category = TicketCategory::General->value;
+    // Optional remote-assistance handle; only collected on the web forms.
+    public string $anydeskId = '';
 
     // Honeypot: real users never fill this, bots do — such submissions are dropped.
     public string $website = '';
@@ -49,7 +51,7 @@ new #[Layout('components.layouts.auth')] #[Title('Submit a Ticket')] class exten
 
         // Silently accept honeypot hits without creating anything.
         if ($this->website !== '') {
-            $this->reset(['name', 'company', 'department', 'position', 'contact', 'subject', 'description', 'website']);
+            $this->reset(['name', 'company', 'department', 'position', 'contact', 'subject', 'description', 'website', 'anydeskId']);
 
             return;
         }
@@ -63,6 +65,7 @@ new #[Layout('components.layouts.auth')] #[Title('Submit a Ticket')] class exten
             'subject' => ['required', 'string', 'max:255'],
             'description' => ['required', 'string', 'max:5000'],
             'category' => ['required', Rule::in(array_column(TicketCategory::cases(), 'value'))],
+            'anydeskId' => ['nullable', 'string', 'max:60'],
         ], [
             'name.required' => 'Please tell us your name.',
             'company.required' => 'Please tell us which company you are from.',
@@ -92,13 +95,14 @@ new #[Layout('components.layouts.auth')] #[Title('Submit a Ticket')] class exten
             'requester_company' => $match ? null : trim($this->company),
             'requester_department' => $this->department !== '' ? trim($this->department) : null,
             'requester_position' => $this->position !== '' ? trim($this->position) : null,
+            'anydesk_id' => $this->anydeskId !== '' ? trim($this->anydeskId) : null,
         ]);
 
         $this->ticketNumber = $ticket->ticket_number;
 
         $this->reset([
             'name', 'company', 'department', 'position', 'contact',
-            'subject', 'description', 'website',
+            'subject', 'description', 'website', 'anydeskId',
         ]);
         $this->category = TicketCategory::General->value;
     }
@@ -156,13 +160,18 @@ new #[Layout('components.layouts.auth')] #[Title('Submit a Ticket')] class exten
 
             <flux:input wire:model="subject" label="Subject" placeholder="Short summary of the issue" />
 
-            <flux:textarea wire:model="description" label="Description" rows="5" placeholder="What is happening? When did it start? What is affected?" />
+            {{-- Classification first helps IT route the request; AnyDesk is optional remote help. --}}
+            <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <flux:select wire:model="category" label="Category of problem">
+                    @foreach (TicketCategory::cases() as $case)
+                        <flux:select.option value="{{ $case->value }}">{{ $case->label() }}</flux:select.option>
+                    @endforeach
+                </flux:select>
 
-            <flux:select wire:model="category" label="Category">
-                @foreach (TicketCategory::cases() as $case)
-                    <flux:select.option value="{{ $case->value }}">{{ $case->label() }}</flux:select.option>
-                @endforeach
-            </flux:select>
+                <flux:input wire:model="anydeskId" label="AnyDesk ID (optional)" placeholder="e.g. 123 456 789 — needed only for remote assistance" />
+            </div>
+
+            <flux:textarea wire:model="description" label="Description" rows="5" placeholder="What is happening? When did it start? What is affected?" />
 
             {{-- Honeypot: visually hidden, only bots fill it. --}}
             <div class="hidden" aria-hidden="true">

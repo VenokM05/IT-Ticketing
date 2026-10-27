@@ -23,12 +23,27 @@ it('renders the theme toggle inside the authenticated shell', function () {
         ->assertSee('Switch to light mode', false);
 });
 
+it('exposes notifications, account and theme controls together in the global top bar', function () {
+    $user = User::factory()->admin()->create();
+
+    // All three utilities must be present in the authenticated shell without the
+    // user opening the sidebar or settings, and the old mobile-only header (which
+    // hid the controls on desktop via lg:hidden) plus the sidebar footer copy are gone.
+    $this->actingAs($user)
+        ->get('/dashboard')
+        ->assertOk()
+        ->assertSee('aria-label="Notifications"', false)   // bell
+        ->assertSee(e($user->email), false)                 // account/profile menu
+        ->assertSee('Switch to dark mode', false)           // theme toggle
+        ->assertDontSee('lg:hidden border-b border-border bg-surface', false);
+});
+
 it('renders every primary route over http for an admin', function (string $path) {
     $this->actingAs(User::factory()->admin()->create())->get($path)->assertOk();
 })->with([
     '/dashboard', '/tickets', '/tickets/create', '/notifications',
     '/employees', '/companies', '/relinks', '/reports',
-    '/settings/profile', '/settings/appearance',
+    '/settings/profile', '/settings/appearance', '/settings/whatsapp',
 ]);
 
 it('ships the design-token layer in the compiled css', function () {

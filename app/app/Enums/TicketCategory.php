@@ -11,11 +11,16 @@ enum TicketCategory: string
     case Hardware = 'hardware';
     case Software = 'software';
     case Network = 'network';
+    case Printer = 'printer';
     case Access = 'access';
     case General = 'general';
 
     public function label(): string
     {
-        return ucfirst($this->value);
+        return match ($this) {
+            self::Access => 'Access/Permissions',
+            self::General => 'General IT Support',
+            default => ucfirst($this->value),
+        };
     }
 }

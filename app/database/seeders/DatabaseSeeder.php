@@ -13,8 +13,11 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
-        // Demo logins + ticket data for the Phase 4 dashboard.
-        $this->call(DemoTicketSeeder::class);
+        // Single IT Administrator login for the dashboard admin pages.
+        $this->call(AdminUserSeeder::class);
+
+        // Live client companies + one IT technician account each (auto-assign target).
+        $this->call(CompanyProvisionerSeeder::class);
 
         // §11.3 outbound template inventory.
         $this->call(WhatsAppTemplateSeeder::class);

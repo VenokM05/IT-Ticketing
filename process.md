@@ -19,7 +19,8 @@ company so the IT Admin can tell which company a request came from.
 There are two web intake paths:
 
 - **Public, no-login form** at **/submit-ticket** (the literal "submit-ticket" page). Any visitor submits without
-  an account, typing their own **Name, Company, Department, Position, contact, subject and problem**. The requester
+  an account, typing their own **Name, Company, Department, Position, contact, subject, problem category and an
+  optional AnyDesk ID** (remote-assistance handle, stored as `tickets.anydesk_id`). The requester
   is not enrolled, so the ticket is stored with no `employee_id` and a self-declared snapshot. The typed company is
   **matched to an active company by name (case-insensitive) or code**; a match is stamped as the ticket's company,
   anything else is filed under the **"Unassigned"** bucket (the claimed name is still shown on the ticket). The form
@@ -27,7 +28,9 @@ There are two web intake paths:
   to quote; they cannot open the dashboard.
 - **Admin on-behalf form** at **/tickets/create** (TicketPolicy::create). The admin picks an enrolled employee; the
   form previews that person's Company / Department / Position and the ticket inherits the company exactly like
-  WhatsApp intake.
+  WhatsApp intake. It also captures the optional AnyDesk ID.
+- Categories are the shared `TicketCategory` enum (Hardware, Software, Network, Printer, Access/Permissions,
+  General IT Support) — one list drives the public form, admin form, filters, and reports.
 
 Both paths funnel through `TicketService::createTicket`, so company attribution stays in one place.
 

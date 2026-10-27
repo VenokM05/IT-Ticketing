@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Enums\ReportStatus;
 use App\Enums\ReportType;
 use App\Enums\TicketStatus;
+use App\Enums\UserRole;
 use App\Exceptions\InvalidStatusTransition;
 use App\Models\Employee;
 use App\Models\Ticket;
@@ -35,22 +36,87 @@ class TicketService
     public function createTicket(array $attributes, ?User $actor = null): Ticket
     {
         return DB::transaction(function () use ($attributes, $actor) {
+            // The company is inherited from the requester's enrollment (never typed
+            // into the chat / form), so intake channels cannot mislabel it.
+            $companyId = $attributes['company_id'] ?? (isset($attributes['employee_id'])
+                ? Employee::query()->whereKey($attributes['employee_id'])->value('company_id')
+                : null);
+
+            $status = $attributes['status'] ?? TicketStatus::New;
+            $assigneeId = $attributes['assigned_to'] ?? null;
+
+            // Auto-assign: when no technician was chosen explicitly, hand the ticket
+            // to the company's least-loaded technician so it skips the unassigned
+            // New queue (config tickets.auto_assign). Calls that already name an
+            // assignee, or companies with no technician, are left untouched.
+            $autoAssignee = null;
+
+            if ($assigneeId === null && $companyId !== null && config('tickets.auto_assign')) {
+                $autoAssignee = $this->resolveAutoAssignee((int) $companyId);
+
+                if ($autoAssignee !== null) {
+                    $assigneeId = $autoAssignee->id;
+
+                    if ($status === TicketStatus::New) {
+                        $status = TicketStatus::Assigned;
+                    }
+                }
+            }
+
             $ticket = Ticket::create([
                 ...$attributes,
-                // The company is inherited from the requester's enrollment (never typed
-                // into the chat / form), so intake channels cannot mislabel it.
-                'company_id' => $attributes['company_id'] ?? (isset($attributes['employee_id'])
-                    ? Employee::query()->whereKey($attributes['employee_id'])->value('company_id')
-                    : null),
+                'company_id' => $companyId,
+                'assigned_to' => $assigneeId,
                 'ticket_number' => $this->numbers->next(),
-                'status' => $attributes['status'] ?? TicketStatus::New,
+                'status' => $status,
             ]);
 
-            $this->recordHistory($ticket, null, $ticket->status, $actor, 'Ticket created');
+            $this->recordHistory(
+                $ticket,
+                null,
+                $ticket->status,
+                $actor,
+                $autoAssignee ? 'Ticket created and auto-assigned to '.$autoAssignee->name : 'Ticket created',
+            );
             $this->notifications->ticketCreated($ticket);
+
+            if ($autoAssignee !== null) {
+                $ticket->load('assignee');
+                $this->notifications->ticketAssigned($ticket);
+            }
 
             return $ticket;
         });
+    }
+
+    /**
+     * Choose the company's technician carrying the fewest open tickets. Returns null
+     * when the company has no active technician, so the ticket falls back to the
+     * manual New queue rather than being mis-assigned.
+     */
+    private function resolveAutoAssignee(int $companyId): ?User
+    {
+        $technicians = User::query()
+            ->where('role', UserRole::Technician->value)
+            ->where('is_active', true)
+            ->where('company_id', $companyId)
+            ->get();
+
+        if ($technicians->isEmpty()) {
+            return null;
+        }
+
+        // One grouped count for the whole company; Resolved/Closed are not "open".
+        $open = Ticket::query()
+            ->selectRaw('assigned_to, count(*) as aggregate')
+            ->where('company_id', $companyId)
+            ->whereNotIn('status', [TicketStatus::Resolved->value, TicketStatus::Closed->value])
+            ->groupBy('assigned_to')
+            ->pluck('aggregate', 'assigned_to');
+
+        return $technicians
+            ->sortBy(fn (User $tech) => (int) $open->get($tech->id, 0))
+            ->first();
     }
 
     /**

@@ -31,6 +31,41 @@ it('shows status counters and the latest ticket to an admin', function () {
         ->assertSee('Laptop dead');
 });
 
+it('shows the public requester snapshot name in the latest list (no enrolled employee)', function () {
+    $admin = dashAdmin();
+    Ticket::factory()->create([
+        'employee_id' => null,
+        'requester_name' => 'External Visitor',
+        'subject' => 'Website down',
+    ]);
+
+    $this->actingAs($admin)
+        ->get('/dashboard')
+        ->assertOk()
+        ->assertSee('External Visitor');
+});
+
+it('shows the requester company and department columns in the latest list', function () {
+    $admin = dashAdmin();
+    $company = \App\Models\Company::factory()->create(['name' => 'Acme Manufacturing', 'code' => null]);
+    $employee = \App\Models\Employee::factory()->create([
+        'company_id' => $company,
+        'department_id' => \App\Models\Department::factory()->create(['name' => 'Finance']),
+    ]);
+    // Direct factory creation skips the service's company inheritance, so stamp it.
+    Ticket::factory()->create([
+        'employee_id' => $employee->id,
+        'company_id' => $company->id,
+        'subject' => 'Scanner offline',
+    ]);
+
+    $this->actingAs($admin)
+        ->get('/dashboard')
+        ->assertOk()
+        ->assertSee('Acme Manufacturing')
+        ->assertSee('Finance');
+});
+
 it('scopes dashboard counters and latest list to the technician queue (§3.3)', function () {
     $tech = dashTech();
     Ticket::factory()->create(['assigned_to' => $tech->id, 'subject' => 'Mine printer jam']);
