@@ -4,9 +4,11 @@ use App\Enums\TicketCategory;
 use App\Enums\TicketPriority;
 use App\Enums\TicketStatus;
 use App\Enums\UserRole;
+use App\Exceptions\InvalidStatusTransition;
 use App\Models\Company;
 use App\Models\Ticket;
 use App\Models\User;
+use App\Services\TicketService;
 use Illuminate\Database\Eloquent\Builder;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
@@ -24,6 +26,14 @@ new #[Layout('components.layouts.app')] #[Title('Tickets')] class extends Compon
     public string $companyId = '';
     public string $from = '';
     public string $to = '';
+
+    /** @var list<int> ticket ids checked for a bulk action */
+    public array $selected = [];
+
+    /** @var list<int> ids on the current page, for select-all */
+    public array $pageIds = [];
+
+    public string $bulkAssignee = '';
 
     public function updated($property): void
     {
@@ -70,6 +80,10 @@ new #[Layout('components.layouts.app')] #[Title('Tickets')] class extends Compon
             ->latest()
             ->paginate(15);
 
+        $this->pageIds = $tickets->pluck('id')->all();
+        // Drop selections that scrolled off the current page so bulk actions stay honest.
+        $this->selected = array_values(array_intersect($this->selected, $this->pageIds));
+
         return [
             'tickets' => $tickets,
             'companies' => Company::query()->orderBy('name')->get(),
@@ -77,6 +91,67 @@ new #[Layout('components.layouts.app')] #[Title('Tickets')] class extends Compon
                 ? User::query()->where('role', UserRole::Technician->value)->orderBy('name')->get()
                 : collect(),
         ];
+    }
+
+    public function toggleAll(): void
+    {
+        $this->selected = $this->selected === [] ? $this->pageIds : [];
+    }
+
+    public function bulkAssign(): void
+    {
+        // Assignment is an administrator action (TicketPolicy::assign).
+        abort_unless(auth()->user()->isAdmin(), 403);
+
+        $this->validate(['bulkAssignee' => ['required', 'integer', 'exists:users,id']]);
+
+        $technician = User::find((int) $this->bulkAssignee);
+        $done = 0;
+        $skipped = 0;
+
+        foreach ($this->selected as $id) {
+            $ticket = Ticket::find($id);
+
+            if (! $ticket || ! auth()->user()->can('assign', $ticket)) {
+                $skipped++;
+
+                continue;
+            }
+
+            app(TicketService::class)->assignTechnician($ticket, $technician, auth()->user());
+            $done++;
+        }
+
+        $this->reset(['selected', 'bulkAssignee']);
+        session()->flash('success', "Assigned {$done} ticket(s)".($skipped ? ", skipped {$skipped}" : '').'.');
+    }
+
+    public function bulkClose(): void
+    {
+        $done = 0;
+        $skipped = 0;
+
+        foreach ($this->selected as $id) {
+            $ticket = Ticket::find($id);
+
+            // Technicians only touch their own, non-closed tickets; already-closed
+            // rows have no transition to Closed and are skipped, not forced.
+            if (! $ticket || ! auth()->user()->can('update', $ticket) || ! $ticket->status->canTransitionTo(TicketStatus::Closed)) {
+                $skipped++;
+
+                continue;
+            }
+
+            try {
+                app(TicketService::class)->changeStatus($ticket, TicketStatus::Closed, auth()->user(), 'Closed via bulk action');
+                $done++;
+            } catch (InvalidStatusTransition) {
+                $skipped++;
+            }
+        }
+
+        $this->reset('selected');
+        session()->flash('success', "Closed {$done} ticket(s)".($skipped ? ", skipped {$skipped}" : '').'.');
     }
 }; ?>
 
@@ -132,10 +207,35 @@ new #[Layout('components.layouts.app')] #[Title('Tickets')] class extends Compon
     </div>
 
     <div class="card overflow-hidden">
+        @if (session('success'))
+            <div class="border-b border-border bg-green-50 px-4 py-2 text-sm text-green-700 dark:bg-green-950 dark:text-green-300">{{ session('success') }}</div>
+        @endif
+
+        {{-- Bulk action bar: appears when rows are selected --}}
+        @if ($selected !== [])
+            <div class="flex flex-wrap items-center gap-2 border-b border-border bg-surface-muted px-4 py-2">
+                <span class="text-sm text-fg-muted">{{ count($selected) }} selected</span>
+                <flux:spacer />
+                @if (auth()->user()->isAdmin())
+                    <flux:select wire:model="bulkAssignee" placeholder="Assign to…" class="w-44">
+                        @foreach ($technicians as $tech)
+                            <flux:select.option value="{{ $tech->id }}">{{ $tech->name }}</flux:select.option>
+                        @endforeach
+                    </flux:select>
+                    <flux:button size="sm" variant="primary" wire:click="bulkAssign">Assign</flux:button>
+                @endif
+                <flux:button size="sm" variant="subtle" wire:click="bulkClose" wire:confirm="Close the selected tickets?">Close</flux:button>
+                <flux:button size="sm" variant="ghost" wire:click="$set('selected', [])">Clear</flux:button>
+            </div>
+        @endif
+
         <div class="overflow-x-auto">
             <table class="w-full text-sm">
                 <thead class="bg-surface-muted text-left">
                     <tr>
+                        <th class="px-4 py-2 w-8">
+                            <input type="checkbox" wire:click="toggleAll" @checked($selected !== [] && count($selected) === count($pageIds)) class="size-4 rounded border-border accent-accent" aria-label="Select all">
+                        </th>
                         <th class="px-4 py-2 font-medium text-fg-subtle">Ticket</th>
                         <th class="px-4 py-2 font-medium text-fg-subtle">Requester</th>
                         <th class="px-4 py-2 font-medium text-fg-subtle">Company</th>
@@ -150,6 +250,9 @@ new #[Layout('components.layouts.app')] #[Title('Tickets')] class extends Compon
                 <tbody class="divide-y divide-border">
                     @forelse ($tickets as $ticket)
                         <tr>
+                            <td class="px-4 py-2">
+                                <input type="checkbox" wire:model="selected" value="{{ $ticket->id }}" class="size-4 rounded border-border accent-accent" aria-label="Select {{ $ticket->ticket_number }}">
+                            </td>
                             <td class="px-4 py-2">
                                 <a href="{{ route('tickets.show', $ticket) }}" wire:navigate class="font-medium text-accent-content hover:underline">
                                     {{ $ticket->ticket_number }}
@@ -174,7 +277,7 @@ new #[Layout('components.layouts.app')] #[Title('Tickets')] class extends Compon
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="9" class="px-4 py-8 text-center text-fg-muted">No tickets match your filters.</td>
+                            <td colspan="10" class="px-4 py-8 text-center text-fg-muted">No tickets match your filters.</td>
                         </tr>
                     @endforelse
                 </tbody>
