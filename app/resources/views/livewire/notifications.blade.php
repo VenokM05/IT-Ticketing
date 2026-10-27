@@ -88,6 +88,14 @@ new #[Layout('components.layouts.app')] #[Title('Notifications')] class extends 
                                 <a href="{{ route('relinks') }}" wire:navigate class="truncate text-sm font-medium text-blue-600 hover:underline dark:text-blue-400">
                                     {{ $notification->title }}
                                 </a>
+                            @elseif ($notification->type === \App\Enums\NotificationType::PendingTicketsAlert)
+                                <a href="{{ route('tickets') }}" wire:navigate class="truncate text-sm font-medium text-blue-600 hover:underline dark:text-blue-400">
+                                    {{ $notification->title }}
+                                </a>
+                            @elseif ($notification->type === \App\Enums\NotificationType::WeeklySummary)
+                                <a href="{{ route('reports') }}" wire:navigate class="truncate text-sm font-medium text-blue-600 hover:underline dark:text-blue-400">
+                                    {{ $notification->title }}
+                                </a>
                             @else
                                 <span class="truncate text-sm font-medium">{{ $notification->title }}</span>
                             @endif

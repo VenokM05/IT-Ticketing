@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\Company;
 use App\Models\Department;
 use App\Models\Employee;
 use Illuminate\Support\Facades\DB;
@@ -9,15 +10,15 @@ use Illuminate\Support\Facades\DB;
 /**
  * Bulk CSV import for the Employee Directory (PRD §9.1, §10.7).
  *
- * Import columns: name, whatsapp_number (E.164), department, location, email, is_active.
- * Department names must map to existing departments — the import fails with a report of
- * unmapped departments rather than creating ad-hoc values. The whole import is
- * transactional: it either applies completely or not at all.
+ * Import columns: name, whatsapp_number (E.164), department, company, position, location, email, is_active.
+ * Department and company names must map to existing records — the import fails with a report of
+ * unmapped values rather than creating ad-hoc ones. The company column is optional so older
+ * exports still import. The whole import is transactional: it either applies completely or not at all.
  */
 class EmployeeImportService
 {
     /**
-     * @return array{ok: bool, imported: int, errors: array<int, array{row: int, message: string}>, unmapped_departments: array<string>}
+     * @return array{ok: bool, imported: int, errors: array<int, array{row: int, message: string}>, unmapped_departments: array<string>, unmapped_companies: array<string>}
      */
     public function import(string $csv): array
     {
@@ -38,6 +39,7 @@ class EmployeeImportService
 
         $errors = [];
         $unmapped = [];
+        $unmappedCompanies = [];
         $validated = [];
         $seenNumbers = [];
 
@@ -82,12 +84,29 @@ class EmployeeImportService
                 $errors[] = ['row' => $rowNo, 'message' => "Unmapped department: '{$deptName}'. Create it before importing."];
             }
 
+            // Company is optional (older CSVs omit it) but must map when supplied.
+            $companyName = $row['company'] ?? '';
+            $company = $companyName === ''
+                ? null
+                : Company::query()
+                    ->where(fn ($q) => $q->where('name', $companyName)->orWhere('code', $companyName))
+                    ->first();
+
+            if ($companyName !== '' && $company === null) {
+                $unmappedCompanies[$companyName] = $companyName;
+                $errors[] = ['row' => $rowNo, 'message' => "Unmapped company: '{$companyName}'. Create it before importing."];
+            }
+
+            $companyOk = $companyName === '' || $company !== null;
+
             // Only stage the row for commit when nothing above failed for it.
-            if ($name !== '' && $digits !== '' && ctype_digit($digits) && $department !== null) {
+            if ($name !== '' && $digits !== '' && ctype_digit($digits) && $department !== null && $companyOk) {
                 $validated[] = [
                     'name' => $name,
                     'whatsapp_number' => $normalized,
                     'department_id' => $department->id,
+                    'company_id' => $company?->id,
+                    'position' => ($row['position'] ?? '') ?: null,
                     'location' => ($row['location'] ?? '') ?: null,
                     'email' => ($row['email'] ?? '') ?: null,
                     'is_active' => filter_var($row['is_active'] ?? '1', FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE) ?? true,
@@ -101,6 +120,7 @@ class EmployeeImportService
                 'imported' => 0,
                 'errors' => $errors,
                 'unmapped_departments' => array_values($unmapped),
+                'unmapped_companies' => array_values($unmappedCompanies),
             ];
         }
 
@@ -115,12 +135,13 @@ class EmployeeImportService
             'imported' => count($validated),
             'errors' => [],
             'unmapped_departments' => [],
+            'unmapped_companies' => [],
         ];
     }
 
     /**
      * @param  array{row: int, message: string}  $error
-     * @return array{ok: bool, imported: int, errors: array<int, array{row: int, message: string}>, unmapped_departments: array<string>}
+     * @return array{ok: bool, imported: int, errors: array<int, array{row: int, message: string}>, unmapped_departments: array<string>, unmapped_companies: array<string>}
      */
     private function failure(array $error): array
     {
@@ -129,6 +150,7 @@ class EmployeeImportService
             'imported' => 0,
             'errors' => [$error],
             'unmapped_departments' => [],
+            'unmapped_companies' => [],
         ];
     }
 }

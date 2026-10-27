@@ -55,6 +55,7 @@ new #[Layout('components.layouts.app')] #[Title('Ticket')] class extends Compone
 
         $this->ticket = $ticket->load([
             'employee.department',
+            'company',
             'assignee',
             'messages' => fn ($q) => $q->with('user')->orderBy('created_at'),
             'attachments',
@@ -260,8 +261,10 @@ new #[Layout('components.layouts.app')] #[Title('Ticket')] class extends Compone
                 <h2 class="text-sm font-semibold">Requester</h2>
                 <dl class="mt-2 grid grid-cols-2 gap-x-4 gap-y-1 text-sm sm:grid-cols-3">
                     <div><dt class="text-zinc-500 dark:text-zinc-400">Name</dt><dd>{{ $ticket->employee?->name ?? '—' }}</dd></div>
+                    <div><dt class="text-zinc-500 dark:text-zinc-400">Company</dt><dd>{{ $ticket->company?->name ?? '—' }}</dd></div>
                     <div><dt class="text-zinc-500 dark:text-zinc-400">WhatsApp</dt><dd>{{ $ticket->employee?->whatsapp_number ?? '—' }}</dd></div>
                     <div><dt class="text-zinc-500 dark:text-zinc-400">Department</dt><dd>{{ $ticket->employee?->department?->name ?? '—' }}</dd></div>
+                    <div><dt class="text-zinc-500 dark:text-zinc-400">Position</dt><dd>{{ $ticket->employee?->position ?? '—' }}</dd></div>
                     <div><dt class="text-zinc-500 dark:text-zinc-400">Location</dt><dd>{{ $ticket->employee?->location ?? '—' }}</dd></div>
                     <div><dt class="text-zinc-500 dark:text-zinc-400">Email</dt><dd>{{ $ticket->employee?->email ?? '—' }}</dd></div>
                     <div><dt class="text-zinc-500 dark:text-zinc-400">Created</dt><dd>{{ $ticket->created_at->format('Y-m-d H:i') }}</dd></div>

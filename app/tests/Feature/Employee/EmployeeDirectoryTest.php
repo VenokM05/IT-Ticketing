@@ -1,5 +1,6 @@
 <?php
 
+use App\Models\Company;
 use App\Models\Department;
 use App\Models\Employee;
 use App\Models\User;
@@ -29,12 +30,15 @@ it('renders the directory for administrators', function () {
 it('creates an employee and normalizes the number toward E.164', function () {
     $this->actingAs(User::factory()->admin()->create());
     $department = Department::factory()->create(['name' => 'IT Support']);
+    $company = Company::factory()->create(['name' => 'Acme Manufacturing']);
 
     Volt::test('employees.index')
         ->call('startCreate')
         ->set('fName', 'Maria Clara')
         ->set('fNumber', '0917 123 4567')
         ->set('fDepartmentId', (string) $department->id)
+        ->set('fCompanyId', (string) $company->id)
+        ->set('fPosition', 'Bookkeeper')
         ->set('fEmail', 'maria@example.com')
         ->call('save')
         ->assertHasNoErrors();
@@ -42,7 +46,25 @@ it('creates an employee and normalizes the number toward E.164', function () {
     $this->assertDatabaseHas('employees', [
         'name' => 'Maria Clara',
         'department_id' => $department->id,
+        'company_id' => $company->id,
+        'position' => 'Bookkeeper',
     ]);
+});
+
+it('requires a company so every request stays attributable', function () {
+    $this->actingAs(User::factory()->admin()->create());
+    $department = Department::factory()->create();
+
+    Volt::test('employees.index')
+        ->call('startCreate')
+        ->set('fName', 'No Company')
+        ->set('fNumber', '09171112223')
+        ->set('fDepartmentId', (string) $department->id)
+        ->set('fCompanyId', '')
+        ->call('save')
+        ->assertHasErrors(['fCompanyId']);
+
+    $this->assertDatabaseMissing('employees', ['name' => 'No Company']);
 });
 
 it('rejects an invalid E.164 number', function () {
@@ -54,6 +76,7 @@ it('rejects an invalid E.164 number', function () {
         ->set('fName', 'Shorty')
         ->set('fNumber', '12345')
         ->set('fDepartmentId', (string) $department->id)
+        ->set('fCompanyId', (string) Company::factory()->create()->id)
         ->call('save')
         ->assertHasErrors(['fNumber']);
 
@@ -70,6 +93,7 @@ it('enforces number uniqueness among active employees', function () {
         ->set('fName', 'Duplicate')
         ->set('fNumber', '639171234567')
         ->set('fDepartmentId', (string) $department->id)
+        ->set('fCompanyId', (string) Company::factory()->create()->id)
         ->call('save')
         ->assertHasErrors(['fNumber']);
 

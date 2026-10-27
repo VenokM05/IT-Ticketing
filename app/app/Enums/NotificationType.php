@@ -11,4 +11,6 @@ enum NotificationType: string
     case TicketAssigned = 'ticket_assigned';
     case StatusChanged = 'status_changed';
     case RelinkRequest = 'relink_request';
+    case PendingTicketsAlert = 'pending_tickets_alert';
+    case WeeklySummary = 'weekly_summary';
 }

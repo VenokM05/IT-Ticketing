@@ -1,5 +1,6 @@
 <?php
 
+use App\Models\Company;
 use App\Models\Department;
 use App\Models\Employee;
 use App\Services\EmployeeImportService;
@@ -15,6 +16,7 @@ new #[Layout('components.layouts.app')] #[Title('Employee Directory')] class ext
 
     public string $search = '';
     public string $departmentId = '';
+    public string $companyId = '';
     public string $status = 'active';
 
     // Create/edit form state.
@@ -23,6 +25,8 @@ new #[Layout('components.layouts.app')] #[Title('Employee Directory')] class ext
     public string $fName = '';
     public string $fNumber = '';
     public string $fDepartmentId = '';
+    public string $fCompanyId = '';
+    public string $fPosition = '';
     public string $fLocation = '';
     public string $fEmail = '';
     public bool $fActive = true;
@@ -38,16 +42,17 @@ new #[Layout('components.layouts.app')] #[Title('Employee Directory')] class ext
 
     public function updated($property): void
     {
-        if (in_array($property, ['search', 'departmentId', 'status'], true)) {
+        if (in_array($property, ['search', 'departmentId', 'companyId', 'status'], true)) {
             $this->resetPage();
         }
     }
 
     public function startCreate(): void
     {
-        $this->reset(['editingId', 'fName', 'fNumber', 'fDepartmentId', 'fLocation', 'fEmail', 'importReport']);
+        $this->reset(['editingId', 'fName', 'fNumber', 'fDepartmentId', 'fCompanyId', 'fPosition', 'fLocation', 'fEmail', 'importReport']);
         $this->fActive = true;
         $this->fDepartmentId = (string) Department::query()->value('id');
+        $this->fCompanyId = (string) Company::query()->active()->value('id');
         $this->showForm = true;
     }
 
@@ -61,6 +66,8 @@ new #[Layout('components.layouts.app')] #[Title('Employee Directory')] class ext
         $this->fName = $employee->name;
         $this->fNumber = $employee->whatsapp_number;
         $this->fDepartmentId = (string) $employee->department_id;
+        $this->fCompanyId = (string) $employee->company_id;
+        $this->fPosition = (string) $employee->position;
         $this->fLocation = (string) $employee->location;
         $this->fEmail = (string) $employee->email;
         $this->fActive = $employee->is_active;
@@ -69,7 +76,7 @@ new #[Layout('components.layouts.app')] #[Title('Employee Directory')] class ext
 
     public function cancel(): void
     {
-        $this->reset(['showForm', 'editingId', 'fName', 'fNumber', 'fDepartmentId', 'fLocation', 'fEmail', 'importReport']);
+        $this->reset(['showForm', 'editingId', 'fName', 'fNumber', 'fDepartmentId', 'fCompanyId', 'fPosition', 'fLocation', 'fEmail', 'importReport']);
     }
 
     public function save(): void
@@ -80,6 +87,8 @@ new #[Layout('components.layouts.app')] #[Title('Employee Directory')] class ext
             'fName' => ['required', 'string', 'max:255'],
             'fNumber' => ['required', 'string', 'max:32'],
             'fDepartmentId' => ['required', 'integer', 'exists:departments,id'],
+            'fCompanyId' => ['required', 'integer', 'exists:companies,id'],
+            'fPosition' => ['nullable', 'string', 'max:255'],
             'fEmail' => ['nullable', 'email', 'max:255'],
         ]);
 
@@ -109,6 +118,8 @@ new #[Layout('components.layouts.app')] #[Title('Employee Directory')] class ext
             'name' => $this->fName,
             'whatsapp_number' => $normalized,
             'department_id' => (int) $this->fDepartmentId,
+            'company_id' => (int) $this->fCompanyId,
+            'position' => $this->fPosition ?: null,
             'location' => $this->fLocation ?: null,
             'email' => $this->fEmail ?: null,
             'is_active' => $this->fActive,
@@ -163,18 +174,20 @@ new #[Layout('components.layouts.app')] #[Title('Employee Directory')] class ext
     {
         return [
             'employees' => Employee::query()
-                ->with('department')
+                ->with(['department', 'company'])
                 ->withCount('tickets')
                 ->when($this->search, fn (Builder $q) => $q->where(fn (Builder $i) => $i
                     ->where('name', 'like', "%{$this->search}%")
                     ->orWhere('whatsapp_number', 'like', "%{$this->search}%")
                     ->orWhere('email', 'like', "%{$this->search}%")))
                 ->when($this->departmentId, fn (Builder $q) => $q->where('department_id', $this->departmentId))
+                ->when($this->companyId, fn (Builder $q) => $q->where('company_id', $this->companyId))
                 ->when($this->status === 'active', fn (Builder $q) => $q->where('is_active', true))
                 ->when($this->status === 'inactive', fn (Builder $q) => $q->where('is_active', false))
                 ->orderBy('name')
                 ->paginate(15),
             'departments' => Department::query()->orderBy('name')->get(),
+            'companies' => Company::query()->orderBy('name')->get(),
         ];
     }
 }; ?>
@@ -207,6 +220,12 @@ new #[Layout('components.layouts.app')] #[Title('Employee Directory')] class ext
                         <flux:select.option value="{{ $dept->id }}">{{ $dept->name }}</flux:select.option>
                     @endforeach
                 </flux:select>
+                <flux:select wire:model="fCompanyId" label="Company">
+                    @foreach ($companies as $company)
+                        <flux:select.option value="{{ $company->id }}">{{ $company->name }}</flux:select.option>
+                    @endforeach
+                </flux:select>
+                <flux:input wire:model="fPosition" label="Position" placeholder="e.g. Accountant" />
                 <flux:input wire:model="fLocation" label="Location" placeholder="e.g. HQ Floor 3" />
                 <flux:input wire:model="fEmail" label="Email" type="email" placeholder="name@company.com" />
                 <flux:checkbox wire:model="fActive" label="Active" />
@@ -222,8 +241,8 @@ new #[Layout('components.layouts.app')] #[Title('Employee Directory')] class ext
     <div class="rounded-xl border border-zinc-200 bg-white p-4 dark:border-zinc-700 dark:bg-zinc-900">
         <h2 class="text-sm font-semibold">Bulk CSV import</h2>
         <p class="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
-            Columns: <code>name, whatsapp_number, department, location, email, is_active</code>.
-            Departments must already exist; the import fails and reports any unmapped department rather than creating ad-hoc values.
+            Columns: <code>name, whatsapp_number, department, company, position, location, email, is_active</code>.
+            Departments and companies must already exist; the import fails and reports any unmapped value rather than creating ad-hoc ones.
         </p>
         <div class="mt-3 flex flex-wrap items-end gap-2">
             <flux:input wire:model="csvFile" type="file" accept=".csv,text/csv" label="CSV file" class="grow" />
@@ -244,14 +263,23 @@ new #[Layout('components.layouts.app')] #[Title('Employee Directory')] class ext
                     @if (! empty($importReport['unmapped_departments']))
                         <p class="mt-2">Unmapped departments: {{ implode(', ', $importReport['unmapped_departments']) }}</p>
                     @endif
+                    @if (! empty($importReport['unmapped_companies']))
+                        <p class="mt-2">Unmapped companies: {{ implode(', ', $importReport['unmapped_companies']) }}</p>
+                    @endif
                 @endif
             </div>
         @endif
     </div>
 
     {{-- Filters --}}
-    <div class="grid gap-3 rounded-xl border border-zinc-200 bg-white p-4 dark:border-zinc-700 dark:bg-zinc-900 sm:grid-cols-4">
+    <div class="grid gap-3 rounded-xl border border-zinc-200 bg-white p-4 dark:border-zinc-700 dark:bg-zinc-900 sm:grid-cols-5">
         <flux:input wire:model.live.debounce.400ms="search" placeholder="Search name / number / email" icon="magnifying-glass" class="sm:col-span-2" />
+        <flux:select wire:model.live="companyId" placeholder="All companies">
+            <flux:select.option value="">All companies</flux:select.option>
+            @foreach ($companies as $company)
+                <flux:select.option value="{{ $company->id }}">{{ $company->name }}</flux:select.option>
+            @endforeach
+        </flux:select>
         <flux:select wire:model.live="departmentId" placeholder="All departments">
             <flux:select.option value="">All departments</flux:select.option>
             @foreach ($departments as $dept)
@@ -273,6 +301,7 @@ new #[Layout('components.layouts.app')] #[Title('Employee Directory')] class ext
                     <tr>
                         <th class="px-4 py-2 font-medium text-zinc-500 dark:text-zinc-400">Name</th>
                         <th class="px-4 py-2 font-medium text-zinc-500 dark:text-zinc-400">WhatsApp</th>
+                        <th class="px-4 py-2 font-medium text-zinc-500 dark:text-zinc-400">Company</th>
                         <th class="px-4 py-2 font-medium text-zinc-500 dark:text-zinc-400">Department</th>
                         <th class="px-4 py-2 font-medium text-zinc-500 dark:text-zinc-400">Tickets</th>
                         <th class="px-4 py-2 font-medium text-zinc-500 dark:text-zinc-400">Status</th>
@@ -287,7 +316,13 @@ new #[Layout('components.layouts.app')] #[Title('Employee Directory')] class ext
                                 <div class="text-xs text-zinc-500 dark:text-zinc-400">{{ $employee->email }}{{ $employee->location ? ' · '.$employee->location : '' }}</div>
                             </td>
                             <td class="px-4 py-2 whitespace-nowrap">{{ $employee->whatsapp_number }}</td>
-                            <td class="px-4 py-2">{{ $employee->department?->name ?? '—' }}</td>
+                            <td class="px-4 py-2">{{ $employee->company?->name ?? '—' }}</td>
+                            <td class="px-4 py-2">
+                                {{ $employee->department?->name ?? '—' }}
+                                @if ($employee->position)
+                                    <div class="text-xs text-zinc-500 dark:text-zinc-400">{{ $employee->position }}</div>
+                                @endif
+                            </td>
                             <td class="px-4 py-2">{{ $employee->tickets_count }}</td>
                             <td class="px-4 py-2"><flux:badge :color="$employee->is_active ? 'green' : 'zinc'" size="sm">{{ $employee->is_active ? 'Active' : 'Inactive' }}</flux:badge></td>
                             <td class="px-4 py-2">
@@ -298,7 +333,7 @@ new #[Layout('components.layouts.app')] #[Title('Employee Directory')] class ext
                             </td>
                         </tr>
                     @empty
-                        <tr><td colspan="6" class="px-4 py-8 text-center text-zinc-500 dark:text-zinc-400">No employees found.</td></tr>
+                        <tr><td colspan="7" class="px-4 py-8 text-center text-zinc-500 dark:text-zinc-400">No employees found.</td></tr>
                     @endforelse
                 </tbody>
             </table>

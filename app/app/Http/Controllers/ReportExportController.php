@@ -17,10 +17,10 @@ class ReportExportController extends Controller
     {
         abort_unless($request->user()?->isAdmin(), 403);
 
-        $filters = $request->only(['from', 'to', 'status', 'priority', 'category', 'technician', 'department']);
+        $filters = $request->only(['from', 'to', 'status', 'priority', 'category', 'technician', 'department', 'company']);
         $rows = $reports->csvRows($filters);
         $header = [
-            'Ticket', 'Subject', 'Employee', 'Department', 'Category', 'Priority',
+            'Ticket', 'Subject', 'Employee', 'Company', 'Department', 'Category', 'Priority',
             'Status', 'Technician', 'Created', 'First Response', 'Resolved', 'Closed', 'Resolution Minutes',
         ];
 

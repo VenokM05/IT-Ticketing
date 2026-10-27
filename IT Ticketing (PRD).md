@@ -547,6 +547,8 @@ Core fields:
 - `name`
 - `whatsapp_number`
 - `department_id` — foreign key to `departments` (Section 7.11)
+- `company_id` — nullable foreign key to `companies` (Section 7.13)
+- `position` — nullable job title, used on ticket requesters' details
 - `location`
 - `email`
 - `is_active`
@@ -564,6 +566,7 @@ Core fields:
 - `id`
 - `ticket_number`
 - `employee_id`
+- `company_id` — nullable foreign key to `companies` (Section 7.13), stamped from the requester's enrollment at creation
 - `assigned_to`
 - `subject`
 - `description`
@@ -735,6 +738,23 @@ Core fields:
 
 Generation rule: within a transaction, lock the sequence row for the current year (`SELECT ... FOR UPDATE`), read `next_value`, increment it, and format the ticket number as `IT-YYYY-NNNNNN` (zero-padded to six digits). Insert a new sequence row with `next_value = 2` when the year rolls over. The unique constraints on `year` and on `tickets.ticket_number` make this safe under concurrent webhook processing.
 
+### 7.13 `companies` — Lookup Table
+
+Stores the company (tenant) list used for multi-company attribution of ticket requests. The system remains a single shared database: companies are a **tag, not an isolation boundary** — there are no per-company scoped views, separate numbers, or per-company ticket numbering.
+
+Core fields:
+
+- `id`
+- `name` — unique
+- `code` — nullable, unique short label (e.g. `ACME`), normalised to upper case; also accepted in employee CSV imports
+- `email`
+- `location`
+- `is_active`
+- `created_at`
+- `updated_at`
+
+Companies are maintained by IT administrators (Companies page). A ticket's `company_id` is never supplied by the sender — it is inherited from the enrolled requester (`employees.company_id`) when the ticket is created, for both the WhatsApp intake pipeline and the web submission form. `departments.company_id` and `users.company_id` are likewise optional tags. Deleting or deactivating a company never deletes historical rows (`ON DELETE SET NULL`), so reports keep their grouping via the fallback label "Unassigned".
+
 ---
 
 ## 8\. Webhook and Message Processing Design
@@ -819,7 +839,7 @@ This section is normative. It defines how employees are registered, how unknown 
 ### 9.1 Employee Registration Sources
 
 - Employees are pre-registered by IT Administrators through a dashboard Employee Directory page (see Section 10.7).
-- Bulk CSV import shall be provided for the initial load and periodic HR sync. Import columns: name, whatsapp_number (E.164), department, location, email, is_active. Imported department names shall map to `departments` (Section 7.11); the import shall fail with a report of unmapped departments rather than create ad-hoc values.
+- Bulk CSV import shall be provided for the initial load and periodic HR sync. Import columns: name, whatsapp_number (E.164), department, company, position, location, email, is_active. The `company` column is optional (legacy files without it still import) and is matched against `companies` (Section 7.13) by name or code; the import shall fail with a report of unmapped companies rather than create ad-hoc values. Imported department names shall map to `departments` (Section 7.11); the import shall fail with a report of unmapped departments rather than create ad-hoc values.
 - The `whatsapp_number` shall be stored normalized in E.164 format (for example `639171234567`) and must be unique across active employee records.
 - Employees cannot self-register in the initial release.
 
@@ -951,7 +971,7 @@ The reports page shall display filtered ticket summaries and allow authorized us
 
 IT Administrators shall be able to:
 
-- Create, edit, and deactivate employee records (name, E.164 WhatsApp number, department, location, email, active flag).
+- Create, edit, and deactivate employee records (name, E.164 WhatsApp number, department, company, position, location, email, active flag). The company (Section 7.13) is required on the form so every request stays attributable.
 - Bulk-import employees from CSV.
 - View each employee's ticket history and last message date.
 - Approve or reject number-relink requests from the dashboard notification feed (Section 9.3).
@@ -1017,6 +1037,7 @@ The system shall generate:
 - Tickets by current status.
 - Tickets by priority.
 - Tickets by department.
+- Tickets by company.
 - Tickets by category.
 - Tickets assigned to each technician.
 - Tickets currently in progress.

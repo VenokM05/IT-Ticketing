@@ -18,6 +18,7 @@ class Ticket extends Model
     protected $fillable = [
         'ticket_number',
         'employee_id',
+        'company_id',
         'assigned_to',
         'subject',
         'description',
@@ -46,6 +47,14 @@ class Ticket extends Model
     public function employee(): BelongsTo
     {
         return $this->belongsTo(Employee::class);
+    }
+
+    /**
+     * Denormalized company of the requester, stamped at intake (multi-company tagging).
+     */
+    public function company(): BelongsTo
+    {
+        return $this->belongsTo(Company::class);
     }
 
     public function assignee(): BelongsTo

@@ -4,6 +4,7 @@ use App\Enums\TicketCategory;
 use App\Enums\TicketPriority;
 use App\Enums\TicketStatus;
 use App\Enums\UserRole;
+use App\Models\Company;
 use App\Models\Department;
 use App\Models\User;
 use App\Services\ReportService;
@@ -19,10 +20,15 @@ new #[Layout('components.layouts.app')] #[Title('Reports')] class extends Compon
     public string $category = '';
     public string $technician = '';
     public string $department = '';
+    public string $company = '';
 
     public function mount(): void
     {
         abort_unless(auth()->user()?->isAdmin(), 403);
+
+        // Company staff get their own company pre-selected as a convenience default;
+        // the view is not restricted (companies are a tag, not an access boundary).
+        $this->company = (string) (auth()->user()?->company_id ?? '');
     }
 
     /**
@@ -38,12 +44,13 @@ new #[Layout('components.layouts.app')] #[Title('Reports')] class extends Compon
             'category' => $this->category,
             'technician' => $this->technician,
             'department' => $this->department,
+            'company' => $this->company,
         ];
     }
 
     public function clear(): void
     {
-        $this->reset(['from', 'to', 'status', 'priority', 'category', 'technician', 'department']);
+        $this->reset(['from', 'to', 'status', 'priority', 'category', 'technician', 'department', 'company']);
     }
 
     /**
@@ -72,27 +79,13 @@ new #[Layout('components.layouts.app')] #[Title('Reports')] class extends Compon
             'exportQuery' => array_filter($this->filters(), fn (string $v) => $v !== ''),
             'technicians' => User::query()->where('role', UserRole::Technician->value)->orderBy('name')->get(),
             'departments' => Department::query()->orderBy('name')->get(),
+            'companies' => Company::query()->orderBy('name')->get(),
         ];
     }
 
     private function human(?float $minutes): string
     {
-        if ($minutes === null) {
-            return '—';
-        }
-
-        $m = (int) round($minutes);
-        if ($m < 60) {
-            return "{$m} min";
-        }
-
-        $h = intdiv($m, 60);
-        $r = $m % 60;
-        if ($h < 24) {
-            return "{$h}h {$r}m";
-        }
-
-        return intdiv($h, 24).'d '.($h % 24).'h';
+        return ReportService::humanize($minutes);
     }
 }; ?>
 
@@ -106,7 +99,7 @@ new #[Layout('components.layouts.app')] #[Title('Reports')] class extends Compon
     </div>
 
     {{-- Filters (shared with the CSV export) --}}
-    <div class="grid grid-cols-2 gap-3 rounded-xl border border-zinc-200 bg-white p-4 dark:border-zinc-700 dark:bg-zinc-900 sm:grid-cols-3 lg:grid-cols-8">
+    <div class="grid grid-cols-2 gap-3 rounded-xl border border-zinc-200 bg-white p-4 dark:border-zinc-700 dark:bg-zinc-900 sm:grid-cols-3 lg:grid-cols-9">
         <flux:input type="date" wire:model.live="from" label="From" />
         <flux:input type="date" wire:model.live="to" label="To" />
         <flux:select wire:model.live="status" placeholder="All statuses">
@@ -131,6 +124,12 @@ new #[Layout('components.layouts.app')] #[Title('Reports')] class extends Compon
             <flux:select.option value="">Any technician</flux:select.option>
             @foreach ($technicians as $tech)
                 <flux:select.option value="{{ $tech->id }}">{{ $tech->name }}</flux:select.option>
+            @endforeach
+        </flux:select>
+        <flux:select wire:model.live="company" placeholder="All companies">
+            <flux:select.option value="">All companies</flux:select.option>
+            @foreach ($companies as $item)
+                <flux:select.option value="{{ $item->id }}">{{ $item->name }}</flux:select.option>
             @endforeach
         </flux:select>
         <flux:select wire:model.live="department" placeholder="All departments">
@@ -225,6 +224,28 @@ new #[Layout('components.layouts.app')] #[Title('Reports')] class extends Compon
                         </tr>
                     @empty
                         <tr><td class="py-2 text-zinc-500 dark:text-zinc-400">No data.</td></tr>
+                    @endforelse
+                </tbody>
+            </table>
+        </div>
+
+        {{-- By company --}}
+        <div class="rounded-xl border border-zinc-200 bg-white p-4 dark:border-zinc-700 dark:bg-zinc-900">
+            <h2 class="mb-3 text-sm font-semibold">By company</h2>
+            <table class="w-full text-sm">
+                <thead class="text-left text-xs text-zinc-500 dark:text-zinc-400">
+                    <tr><th class="pb-1 font-medium">Company</th><th class="pb-1 text-right font-medium">Open</th><th class="pb-1 text-right font-medium">Resolved</th><th class="pb-1 text-right font-medium">Total</th></tr>
+                </thead>
+                <tbody class="divide-y divide-zinc-200 dark:divide-zinc-700">
+                    @forelse ($report['by_company'] as $row)
+                        <tr>
+                            <td class="py-1.5">{{ $row['company'] }}</td>
+                            <td class="py-1.5 text-right tabular-nums">{{ $row['open'] }}</td>
+                            <td class="py-1.5 text-right tabular-nums">{{ $row['resolved'] }}</td>
+                            <td class="py-1.5 text-right tabular-nums">{{ $row['count'] }}</td>
+                        </tr>
+                    @empty
+                        <tr><td colspan="4" class="py-2 text-zinc-500 dark:text-zinc-400">No data.</td></tr>
                     @endforelse
                 </tbody>
             </table>

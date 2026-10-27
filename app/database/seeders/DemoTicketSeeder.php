@@ -8,6 +8,7 @@ use App\Enums\MessageDirection;
 use App\Enums\MessageType;
 use App\Enums\TicketStatus;
 use App\Enums\UserRole;
+use App\Models\Company;
 use App\Models\Department;
 use App\Models\Employee;
 use App\Models\Ticket;
@@ -17,39 +18,71 @@ use App\Services\TicketService;
 use Illuminate\Database\Seeder;
 
 /**
- * Demo data for browsing the Phase 4 dashboard (PRD §10). Safe to re-run:
- * logins use firstOrCreate; tickets are only generated when none exist.
+ * Demo data for browsing the dashboard (PRD §10) across three companies. Safe to
+ * re-run: logins use firstOrCreate; tickets are only generated when none exist.
  */
 class DemoTicketSeeder extends Seeder
 {
     public function run(): void
     {
-        $admin = $this->user('Ada Admin', 'admin@example.com', UserRole::Admin);
-        $tech1 = $this->user('Ben Technician', 'ben@example.com', UserRole::Technician);
-        $tech2 = $this->user('Cara Technician', 'cara@example.com', UserRole::Technician);
+        $companies = collect([
+            ['Acme Manufacturing', 'ACME', 'it@acme.example'],
+            ['Northwind Logistics', 'NWIND', 'helpdesk@northwind.example'],
+            ['Globex Corporation', 'GLOBEX', 'support@globex.example'],
+        ])->mapWithKeys(fn (array $row) => [$row[0] => Company::firstOrCreate(
+            ['name' => $row[0]],
+            ['code' => $row[1], 'email' => $row[2], 'location' => 'Cebu City', 'is_active' => true],
+        )]);
 
-        $departments = collect(['IT Infrastructure', 'Helpdesk', 'Finance', 'HR', 'Operations'])
-            ->map(fn (string $name) => Department::firstOrCreate(['name' => $name]));
+        $admin = $this->user('Ada Admin', 'admin@example.com', UserRole::Admin);
+        $tech1 = $this->user('Ben Technician', 'ben@example.com', UserRole::Technician, $companies['Acme Manufacturing']);
+        $tech2 = $this->user('Cara Technician', 'cara@example.com', UserRole::Technician, $companies['Northwind Logistics']);
+
+        // Departments belong to a company; employees inherit it through their department.
+        $departments = collect([
+            'IT Infrastructure' => 'Acme Manufacturing',
+            'Finance' => 'Acme Manufacturing',
+            'Helpdesk' => 'Northwind Logistics',
+            'HR' => 'Northwind Logistics',
+            'Operations' => 'Globex Corporation',
+        ])->map(fn (string $companyName, string $deptName) => $this->department($deptName, $companies[$companyName]));
 
         $employees = collect([
-            ['Dana Employee', '09171234501', 'Finance'],
-            ['Evan Employee', '09171234502', 'Operations'],
-            ['Faye Employee', '09171234503', 'HR'],
-            ['Gus Employee', '09171234504', 'Finance'],
+            ['Dana Employee', '09171234501', 'Finance', 'Accountant'],
+            ['Evan Employee', '09171234502', 'Operations', 'Warehouse Supervisor'],
+            ['Faye Employee', '09171234503', 'HR', 'HR Officer'],
+            ['Gus Employee', '09171234504', 'Finance', 'Finance Clerk'],
         ])->map(function (array $row) use ($departments) {
+            $department = $departments->firstWhere('name', $row[2]);
+
             return Employee::firstOrCreate(
                 ['whatsapp_number' => '+63'.substr($row[1], 2)],
                 [
                     'name' => $row[0],
                     'email' => strtolower(str_replace(' ', '.', $row[0])).'-'.($row[1]).'@example.com',
-                    'department_id' => $departments->firstWhere('name', $row[2])->id,
+                    'department_id' => $department->id,
+                    'company_id' => $department->company_id,
+                    'position' => $row[3],
                     'location' => 'HQ Floor '.rand(1, 5),
                     'is_active' => true,
                 ],
             );
         });
 
+        // Keep previously-seeded rows consistent with the new company tagging.
+        Employee::query()->whereNull('company_id')->with('department:id,company_id')->each(function (Employee $employee) {
+            if ($employee->department?->company_id !== null) {
+                $employee->update(['company_id' => $employee->department->company_id]);
+            }
+        });
+
         if (Ticket::query()->count() > 0) {
+            Ticket::query()->whereNull('company_id')->with('employee:id,company_id')->each(function (Ticket $ticket) {
+                if ($ticket->employee?->company_id !== null) {
+                    $ticket->update(['company_id' => $ticket->employee->company_id]);
+                }
+            });
+
             return; // existing data set untouched
         }
 
@@ -112,17 +145,35 @@ class DemoTicketSeeder extends Seeder
         $make('Wi-Fi drops near pantry', 'Connection drops daily around 10am.', 1);
     }
 
-    private function user(string $name, string $email, UserRole $role): User
+    private function user(string $name, string $email, UserRole $role, ?Company $company = null): User
     {
-        return User::firstOrCreate(
+        $user = User::firstOrCreate(
             ['email' => $email],
             [
                 'name' => $name,
                 'password' => 'password',
                 'role' => $role,
+                'company_id' => $company?->id,
                 'is_active' => true,
                 'email_verified_at' => now(),
             ],
         );
+
+        if ($company !== null && $user->company_id === null) {
+            $user->update(['company_id' => $company->id]);
+        }
+
+        return $user;
+    }
+
+    private function department(string $name, Company $company): Department
+    {
+        $department = Department::firstOrCreate(['name' => $name], ['company_id' => $company->id]);
+
+        if ($department->company_id === null) {
+            $department->update(['company_id' => $company->id]);
+        }
+
+        return $department;
     }
 }

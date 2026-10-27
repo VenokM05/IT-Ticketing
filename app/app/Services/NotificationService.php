@@ -94,6 +94,34 @@ class NotificationService
     }
 
     /**
+     * Operational alert for every active administrator (process.md items 5 and 6):
+     * the daily pending-request reminder and the Friday weekly summary. Not tied to a
+     * ticket, so ticket_id stays null and the run date (Ymd) is the ref id — that makes
+     * each day's alert unique while keeping same-day re-runs idempotent.
+     *
+     * @param  array<string, mixed>|null  $data
+     */
+    public function adminAlert(NotificationType $type, int $refId, string $title, ?string $message, ?array $data = null): void
+    {
+        User::query()
+            ->where('role', UserRole::Admin->value)
+            ->where('is_active', true)
+            ->each(fn (User $admin) => DashboardNotification::query()->firstOrCreate(
+                [
+                    'user_id' => $admin->id,
+                    'type' => $type->value,
+                    'ticket_id' => null,
+                    'ref_id' => $refId,
+                ],
+                [
+                    'title' => $title,
+                    'message' => $message,
+                    'data' => $data,
+                ],
+            ));
+    }
+
+    /**
      * @param  array<string, mixed>|null  $data
      */
     private function pushAllAdmins(

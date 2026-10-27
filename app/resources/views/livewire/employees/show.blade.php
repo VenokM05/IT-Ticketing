@@ -13,7 +13,7 @@ new #[Layout('components.layouts.app')] #[Title('Employee')] class extends Compo
     {
         $this->authorize('view', $employee);
 
-        $this->employee = $employee->load(['department', 'tickets' => fn ($q) => $q->with('assignee')->latest()]);
+        $this->employee = $employee->load(['department', 'company', 'tickets' => fn ($q) => $q->with('assignee')->latest()]);
     }
 
     public function with(): array
@@ -42,7 +42,9 @@ new #[Layout('components.layouts.app')] #[Title('Employee')] class extends Compo
             <h2 class="text-sm font-semibold">Profile</h2>
             <dl class="mt-2 space-y-1 text-sm">
                 <div class="flex justify-between"><dt class="text-zinc-500 dark:text-zinc-400">WhatsApp</dt><dd>{{ $employee->whatsapp_number }}</dd></div>
+                <div class="flex justify-between"><dt class="text-zinc-500 dark:text-zinc-400">Company</dt><dd>{{ $employee->company?->name ?? '—' }}</dd></div>
                 <div class="flex justify-between"><dt class="text-zinc-500 dark:text-zinc-400">Department</dt><dd>{{ $employee->department?->name ?? '—' }}</dd></div>
+                <div class="flex justify-between"><dt class="text-zinc-500 dark:text-zinc-400">Position</dt><dd>{{ $employee->position ?? '—' }}</dd></div>
                 <div class="flex justify-between"><dt class="text-zinc-500 dark:text-zinc-400">Location</dt><dd>{{ $employee->location ?? '—' }}</dd></div>
                 <div class="flex justify-between"><dt class="text-zinc-500 dark:text-zinc-400">Email</dt><dd>{{ $employee->email ?? '—' }}</dd></div>
                 <div class="flex justify-between"><dt class="text-zinc-500 dark:text-zinc-400">Registered</dt><dd>{{ $employee->created_at->format('Y-m-d') }}</dd></div>

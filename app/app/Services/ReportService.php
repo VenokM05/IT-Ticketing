@@ -20,19 +20,20 @@ class ReportService
     /**
      * A shared, filter-aware ticket query used by both the report page and CSV export.
      *
-     * @param  array<string, mixed>  $filters  keys: from,to,status,priority,category,technician,department
+     * @param  array<string, mixed>  $filters  keys: from,to,status,priority,category,technician,department,company
      */
     public function query(array $filters = []): Builder
     {
         return Ticket::query()
-            ->with(['employee.department', 'assignee'])
+            ->with(['employee.department', 'company', 'assignee'])
             ->when($filters['from'] ?? null, fn (Builder $q, string $v) => $q->whereDate('created_at', '>=', $v))
             ->when($filters['to'] ?? null, fn (Builder $q, string $v) => $q->whereDate('created_at', '<=', $v))
             ->when($filters['status'] ?? null, fn (Builder $q, string $v) => $q->where('status', $v))
             ->when($filters['priority'] ?? null, fn (Builder $q, string $v) => $q->where('priority', $v))
             ->when($filters['category'] ?? null, fn (Builder $q, string $v) => $q->where('category', $v))
             ->when($filters['technician'] ?? null, fn (Builder $q, string $v) => $q->where('assigned_to', $v))
-            ->when($filters['department'] ?? null, fn (Builder $q, string $v) => $q->whereHas('employee', fn (Builder $e) => $e->where('department_id', $v)));
+            ->when($filters['department'] ?? null, fn (Builder $q, string $v) => $q->whereHas('employee', fn (Builder $e) => $e->where('department_id', $v)))
+            ->when($filters['company'] ?? null, fn (Builder $q, string $v) => $q->where('company_id', $v));
     }
 
     /**
@@ -52,6 +53,7 @@ class ReportService
             'by_status' => $this->byStatus($tickets),
             'by_priority' => $this->byPriority($tickets),
             'by_category' => $this->byCategory($tickets),
+            'by_company' => $this->byCompany($tickets),
             'by_department' => $this->byDepartment($tickets),
             'workload' => $this->technicianWorkload($tickets),
             'daily' => $this->trend($tickets, 'day'),
@@ -146,6 +148,27 @@ class ReportService
     }
 
     /**
+     * Volume per company (multi-tenant tagging), most tickets first.
+     *
+     * @param  Collection<int, Ticket>  $tickets
+     * @return array<int, array{company: string, count: int, open: int, resolved: int}>
+     */
+    public function byCompany(Collection $tickets): array
+    {
+        return $tickets
+            ->groupBy(fn (Ticket $t) => $t->company?->name ?? 'Unassigned')
+            ->map(fn (Collection $g, string $name) => [
+                'company' => $name,
+                'count' => $g->count(),
+                'open' => $g->where('status', '!=', TicketStatus::Closed)->count(),
+                'resolved' => $g->whereIn('status', [TicketStatus::Resolved, TicketStatus::Closed])->count(),
+            ])
+            ->sortByDesc('count')
+            ->values()
+            ->all();
+    }
+
+    /**
      * @param  Collection<int, Ticket>  $tickets
      * @return array<int, array{department: string, count: int, open: int}>
      */
@@ -228,6 +251,7 @@ class ReportService
                 'ticket_number' => $t->ticket_number,
                 'subject' => $t->subject,
                 'employee' => $t->employee?->name,
+                'company' => $t->company?->name,
                 'department' => $t->employee?->department?->name,
                 'category' => $t->category->label(),
                 'priority' => $t->priority->label(),
@@ -240,6 +264,30 @@ class ReportService
                 'resolution_minutes' => $t->resolved_at ? (int) round($t->created_at->diffInMinutes($t->resolved_at)) : null,
             ])
             ->all();
+    }
+
+    /**
+     * Render a minute count as a compact human duration (shared by the report
+     * page and the scheduled weekly summary).
+     */
+    public static function humanize(?float $minutes): string
+    {
+        if ($minutes === null) {
+            return '—';
+        }
+
+        $m = (int) round($minutes);
+        if ($m < 60) {
+            return "{$m} min";
+        }
+
+        $h = intdiv($m, 60);
+        $r = $m % 60;
+        if ($h < 24) {
+            return "{$h}h {$r}m";
+        }
+
+        return intdiv($h, 24).'d '.($h % 24).'h';
     }
 
     /**

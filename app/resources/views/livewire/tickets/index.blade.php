@@ -4,6 +4,7 @@ use App\Enums\TicketCategory;
 use App\Enums\TicketPriority;
 use App\Enums\TicketStatus;
 use App\Enums\UserRole;
+use App\Models\Company;
 use App\Models\Ticket;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Builder;
@@ -20,6 +21,7 @@ new #[Layout('components.layouts.app')] #[Title('Tickets')] class extends Compon
     public string $priority = '';
     public string $category = '';
     public string $technician = '';
+    public string $companyId = '';
     public string $from = '';
     public string $to = '';
 
@@ -30,7 +32,7 @@ new #[Layout('components.layouts.app')] #[Title('Tickets')] class extends Compon
 
     public function clear(): void
     {
-        $this->reset(['search', 'status', 'priority', 'category', 'technician', 'from', 'to']);
+        $this->reset(['search', 'status', 'priority', 'category', 'technician', 'companyId', 'from', 'to']);
         $this->resetPage();
     }
 
@@ -43,7 +45,7 @@ new #[Layout('components.layouts.app')] #[Title('Tickets')] class extends Compon
         $isAdmin = $user->isAdmin();
 
         $tickets = Ticket::query()
-            ->with(['assignee', 'employee'])
+            ->with(['assignee', 'employee', 'company'])
             ->when(! $isAdmin, fn (Builder $q) => $q->where('assigned_to', $user->id))
             ->when($this->search, function (Builder $q) use ($isAdmin) {
                 $q->where(function (Builder $inner) use ($isAdmin) {
@@ -60,6 +62,7 @@ new #[Layout('components.layouts.app')] #[Title('Tickets')] class extends Compon
             ->when($this->priority, fn (Builder $q) => $q->where('priority', $this->priority))
             ->when($this->category, fn (Builder $q) => $q->where('category', $this->category))
             ->when($this->technician, fn (Builder $q) => $q->where('assigned_to', $this->technician))
+            ->when($this->companyId, fn (Builder $q) => $q->where('company_id', $this->companyId))
             ->when($this->from, fn (Builder $q) => $q->whereDate('created_at', '>=', $this->from))
             ->when($this->to, fn (Builder $q) => $q->whereDate('created_at', '<=', $this->to))
             ->latest()
@@ -67,6 +70,7 @@ new #[Layout('components.layouts.app')] #[Title('Tickets')] class extends Compon
 
         return [
             'tickets' => $tickets,
+            'companies' => Company::query()->orderBy('name')->get(),
             'technicians' => $isAdmin
                 ? User::query()->where('role', UserRole::Technician->value)->orderBy('name')->get()
                 : collect(),
@@ -82,6 +86,9 @@ new #[Layout('components.layouts.app')] #[Title('Tickets')] class extends Compon
                 {{ auth()->user()->isAdmin() ? 'All tickets' : 'Your assigned tickets' }}
             </p>
         </div>
+        @if (auth()->user()->can('create', Ticket::class))
+            <flux:button :href="route('tickets.create')" variant="primary" icon="plus" wire:navigate>New Ticket</flux:button>
+        @endif
     </div>
 
     {{-- Search + filters (§10.2) --}}
@@ -108,6 +115,12 @@ new #[Layout('components.layouts.app')] #[Title('Tickets')] class extends Compon
             @endforeach
         </flux:select>
         @if (auth()->user()->isAdmin())
+            <flux:select wire:model.live="companyId" placeholder="All companies">
+                <flux:select.option value="">All companies</flux:select.option>
+                @foreach ($companies as $company)
+                    <flux:select.option value="{{ $company->id }}">{{ $company->name }}</flux:select.option>
+                @endforeach
+            </flux:select>
             <flux:select wire:model.live="technician" placeholder="Any technician">
                 <flux:select.option value="">Any technician</flux:select.option>
                 @foreach ($technicians as $tech)
@@ -127,6 +140,7 @@ new #[Layout('components.layouts.app')] #[Title('Tickets')] class extends Compon
                     <tr>
                         <th class="px-4 py-2 font-medium text-zinc-500 dark:text-zinc-400">Ticket</th>
                         <th class="px-4 py-2 font-medium text-zinc-500 dark:text-zinc-400">Employee</th>
+                        <th class="px-4 py-2 font-medium text-zinc-500 dark:text-zinc-400">Company</th>
                         <th class="px-4 py-2 font-medium text-zinc-500 dark:text-zinc-400">Category</th>
                         <th class="px-4 py-2 font-medium text-zinc-500 dark:text-zinc-400">Priority</th>
                         <th class="px-4 py-2 font-medium text-zinc-500 dark:text-zinc-400">Status</th>
@@ -144,6 +158,7 @@ new #[Layout('components.layouts.app')] #[Title('Tickets')] class extends Compon
                                 <div class="text-zinc-500 dark:text-zinc-400">{{ $ticket->subject }}</div>
                             </td>
                             <td class="px-4 py-2">{{ $ticket->employee?->name ?? '—' }}</td>
+                            <td class="px-4 py-2">{{ $ticket->company?->label() ?? '—' }}</td>
                             <td class="px-4 py-2">{{ $ticket->category->label() }}</td>
                             <td class="px-4 py-2"><flux:badge :color="match ($ticket->priority) { \App\Enums\TicketPriority::Critical => 'red', \App\Enums\TicketPriority::High => 'orange', default => 'zinc' }" size="sm">{{ $ticket->priority->label() }}</flux:badge></td>
                             <td class="px-4 py-2"><flux:badge :color="match ($ticket->status) { \App\Enums\TicketStatus::Closed => 'zinc', \App\Enums\TicketStatus::Resolved => 'green', \App\Enums\TicketStatus::InProgress => 'blue', \App\Enums\TicketStatus::Pending => 'amber', default => 'purple' }" size="sm">{{ $ticket->status->label() }}</flux:badge></td>
@@ -152,7 +167,7 @@ new #[Layout('components.layouts.app')] #[Title('Tickets')] class extends Compon
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="7" class="px-4 py-8 text-center text-zinc-500 dark:text-zinc-400">No tickets match your filters.</td>
+                            <td colspan="8" class="px-4 py-8 text-center text-zinc-500 dark:text-zinc-400">No tickets match your filters.</td>
                         </tr>
                     @endforelse
                 </tbody>

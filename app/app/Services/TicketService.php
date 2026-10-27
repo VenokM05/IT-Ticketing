@@ -6,6 +6,7 @@ use App\Enums\ReportStatus;
 use App\Enums\ReportType;
 use App\Enums\TicketStatus;
 use App\Exceptions\InvalidStatusTransition;
+use App\Models\Employee;
 use App\Models\Ticket;
 use App\Models\TicketProgressReport;
 use App\Models\TicketProgressUpdate;
@@ -36,6 +37,11 @@ class TicketService
         return DB::transaction(function () use ($attributes, $actor) {
             $ticket = Ticket::create([
                 ...$attributes,
+                // The company is inherited from the requester's enrollment (never typed
+                // into the chat / form), so intake channels cannot mislabel it.
+                'company_id' => $attributes['company_id'] ?? (isset($attributes['employee_id'])
+                    ? Employee::query()->whereKey($attributes['employee_id'])->value('company_id')
+                    : null),
                 'ticket_number' => $this->numbers->next(),
                 'status' => $attributes['status'] ?? TicketStatus::New,
             ]);

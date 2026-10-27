@@ -2,6 +2,7 @@
 
 namespace Database\Factories;
 
+use App\Models\Company;
 use App\Models\Department;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
@@ -17,6 +18,8 @@ class EmployeeFactory extends Factory
             'whatsapp_number' => '+63'.fake()->unique()->numerify('9#########'),
             'email' => fake()->unique()->safeEmail(),
             'department_id' => Department::factory(),
+            'company_id' => Company::factory(),
+            'position' => fake()->jobTitle(),
             'location' => fake()->city(),
             'is_active' => true,
         ];

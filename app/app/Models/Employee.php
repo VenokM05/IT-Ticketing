@@ -16,6 +16,8 @@ class Employee extends Model
         'whatsapp_number',
         'email',
         'department_id',
+        'company_id',
+        'position',
         'location',
         'is_active',
     ];
@@ -30,6 +32,11 @@ class Employee extends Model
     public function department(): BelongsTo
     {
         return $this->belongsTo(Department::class);
+    }
+
+    public function company(): BelongsTo
+    {
+        return $this->belongsTo(Company::class);
     }
 
     public function tickets(): HasMany

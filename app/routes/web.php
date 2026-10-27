@@ -13,6 +13,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Volt::route('notifications', 'notifications')->name('notifications');
 
     Volt::route('tickets', 'tickets.index')->name('tickets');
+    // Manual submission on behalf of an employee (admin-only via TicketPolicy::create).
+    Volt::route('tickets/create', 'tickets.create')->name('tickets.create');
     Volt::route('tickets/{ticket}', 'tickets.show')
         ->name('tickets.show');
 
@@ -23,6 +25,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     // Number-relink approvals — administrator only (§9.3, §10.7).
     Volt::route('relinks', 'relinks.index')->name('relinks');
+
+    // Companies — multi-tenant tagging, administrator only.
+    Volt::route('companies', 'companies.index')->name('companies');
 
     // Operational reporting — administrator only (Phase 6); gated in the page/controller.
     Volt::route('reports', 'reports.index')->name('reports');
