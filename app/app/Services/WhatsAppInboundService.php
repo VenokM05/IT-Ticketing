@@ -251,10 +251,29 @@ class WhatsAppInboundService
 
     private function closeTicket(Employee $employee, string $ticketNumber, string $rawBody): void
     {
-        $ticket = Ticket::query()->where('employee_id', $employee->id)->where('ticket_number', $ticketNumber)->first();
+        // CLOSE <number> [rating] [comment…] — parsed from the original message body
+        // so an optional comment keeps its natural casing. The reference is normalised
+        // to upper case to match the ticket number; a bare CLOSE <number> is unchanged.
+        $tokens = preg_split('/\s+/', trim($rawBody)) ?: [];
+        if (preg_match('/^close$/i', $tokens[0] ?? '')) {
+            array_shift($tokens);
+        }
+        $reference = strtoupper((string) ($tokens[0] ?? '')) ?: strtoupper(trim($ticketNumber));
+        array_shift($tokens);
+
+        $rating = null;
+        $comment = null;
+        if ($tokens !== [] && preg_match('/^[1-5]$/', $tokens[0])) {
+            $rating = (int) array_shift($tokens);
+        }
+        if ($tokens !== []) {
+            $comment = trim(implode(' ', $tokens));
+        }
+
+        $ticket = Ticket::query()->where('employee_id', $employee->id)->where('ticket_number', $reference)->first();
 
         if (! $ticket) {
-            $this->outbound->sendPlainText($employee->whatsapp_number, "No ticket {$ticketNumber} found for your number.");
+            $this->outbound->sendPlainText($employee->whatsapp_number, "No ticket {$reference} found for your number.");
 
             return;
         }
@@ -268,6 +287,11 @@ class WhatsAppInboundService
         }
 
         $closed = $this->tickets->changeStatus($ticket, TicketStatus::Closed, null, 'Closed by employee via WhatsApp', notifyEmployee: false);
+
+        if ($rating !== null) {
+            $closed = $this->tickets->recordCsat($closed, $rating, $comment);
+        }
+
         $this->outbound->sendSession($closed, $employee, "Ticket {$closed->ticket_number} has been closed. Reply with a new message any time to reopen or add details.");
     }
 

@@ -143,6 +143,23 @@ class TicketService
     }
 
     /**
+     * Stamp a requester satisfaction score (CSAT, 1-5) with an optional comment.
+     * Clamped to the 1-5 band so a stray value never corrupts the reporting average.
+     */
+    public function recordCsat(Ticket $ticket, int $rating, ?string $comment = null): Ticket
+    {
+        $comment = $comment !== null ? trim($comment) : null;
+
+        $ticket->update([
+            'rating' => max(1, min(5, $rating)),
+            'rating_comment' => $comment !== null && $comment !== '' ? $comment : null,
+            'rated_at' => now(),
+        ]);
+
+        return $ticket->refresh();
+    }
+
+    /**
      * Choose who a ticket auto-routes to within the company. When a category is
      * known it prefers an on-call technician skilled in that category, then any
      * skilled technician, then — as a last resort — the least-loaded technician

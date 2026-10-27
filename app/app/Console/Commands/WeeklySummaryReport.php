@@ -37,6 +37,8 @@ class WeeklySummaryReport extends Command
             ->map(fn (array $row) => "{$row['company']}: {$row['count']}")
             ->implode(' · ');
 
+        $csat = $metrics['csat_avg'] === null ? null : $metrics['csat_avg'].'/5 ('.$metrics['csat_count'].')';
+
         $notifications->adminAlert(
             type: NotificationType::WeeklySummary,
             refId: (int) $now->format('Ymd'),
@@ -45,6 +47,8 @@ class WeeklySummaryReport extends Command
                 "Created {$totals['created']} · Resolved {$totals['resolved']} · Closed {$totals['closed']}"
                 ." · Still open {$totals['open']}"
                 .' · Avg resolution '.ReportService::humanize($metrics['resolution_avg_minutes'])
+                .' · Reopen '.$metrics['reopen_rate'].'%'
+                .($csat !== null ? " · CSAT {$csat}" : '')
                 .($companies !== '' ? " · Top companies: {$companies}" : '')
             ),
             data: [

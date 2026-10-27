@@ -51,6 +51,11 @@ new #[Layout('components.layouts.app')] #[Title('Ticket')] class extends Compone
 
     public string $noteMacroId = '';
 
+    // Optional requester satisfaction captured when resolving/closing (CSAT, Phase 6).
+    public string $csatRating = '';
+
+    public string $csatComment = '';
+
     public function mount(Ticket $ticket): void
     {
         // Server-side authorization on every page (FR-13).
@@ -94,7 +99,12 @@ new #[Layout('components.layouts.app')] #[Title('Ticket')] class extends Compone
             return;
         }
 
-        $this->reset('remark');
+        // Capture "How was IT?" alongside a resolve/close when a score was given.
+        if ($this->csatRating !== '' && in_array($target, [TicketStatus::Resolved, TicketStatus::Closed], true)) {
+            app(TicketService::class)->recordCsat($this->ticket, (int) $this->csatRating, $this->csatComment ?: null);
+        }
+
+        $this->reset(['remark', 'csatRating', 'csatComment']);
         $this->refreshTicket();
         $this->dispatch('notification-refresh');
         session()->flash('success', 'Status updated');
@@ -489,6 +499,19 @@ new #[Layout('components.layouts.app')] #[Title('Ticket')] class extends Compone
                 @endif
             </div>
 
+            @if ($ticket->rating !== null)
+                <div class="card p-4">
+                    <h2 class="text-sm font-semibold">Requester satisfaction</h2>
+                    <div class="mt-2 flex items-center gap-2">
+                        <flux:badge color="green" size="sm">{{ $ticket->rating }}/5</flux:badge>
+                        <span class="text-xs text-fg-muted">rated {{ $ticket->rated_at?->format('Y-m-d H:i') }}</span>
+                    </div>
+                    @if ($ticket->rating_comment)
+                        <p class="mt-2 text-sm text-fg-muted">{{ $ticket->rating_comment }}</p>
+                    @endif
+                </div>
+            @endif
+
             @if ($canUpdate)
                 <div class="card p-4">
                     <h2 class="text-sm font-semibold">Change status</h2>
@@ -504,6 +527,19 @@ new #[Layout('components.layouts.app')] #[Title('Ticket')] class extends Compone
                             <p class="text-sm text-fg-muted">No further transitions — ticket is closed.</p>
                         @endforelse
                     </div>
+
+                    {{-- "How was IT?" — optional CSAT captured alongside a resolve/close --}}
+                    @if (collect($allowedTransitions)->contains(fn ($t) => in_array($t->value, ['resolved', 'closed'], true)))
+                        <div class="mt-3 border-t border-border pt-3">
+                            <p class="text-xs text-fg-muted">How was IT? (optional) — captured with the status change above.</p>
+                            <div class="mt-2 flex flex-wrap items-center gap-2">
+                                @foreach ([1, 2, 3, 4, 5] as $star)
+                                    <flux:button size="xs" variant="{{ (int) $csatRating === $star ? 'primary' : 'subtle' }}" wire:click="$set('csatRating', '{{ $star }}')">{{ $star }}</flux:button>
+                                @endforeach
+                            </div>
+                            <flux:input wire:model="csatComment" placeholder="Comments (optional)" class="mt-2" />
+                        </div>
+                    @endif
                 </div>
 
                 <div class="card p-4">

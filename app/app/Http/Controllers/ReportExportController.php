@@ -21,7 +21,7 @@ class ReportExportController extends Controller
         $rows = $reports->csvRows($filters);
         $header = [
             'Ticket', 'Subject', 'Employee', 'Company', 'Department', 'Category', 'Priority',
-            'Status', 'Technician', 'Created', 'First Response', 'Resolved', 'Closed', 'Resolution Minutes',
+            'Status', 'Technician', 'Created', 'First Response', 'Resolved', 'Closed', 'Resolution Minutes', 'CSAT', 'CSAT Comment',
         ];
 
         $range = trim(($filters['from'] ?? '').'_'.($filters['to'] ?? ''), '_');

@@ -159,13 +159,13 @@ new #[Layout('components.layouts.app')] #[Title('Reports')] class extends Compon
     {{-- Response & resolution metrics --}}
     <div class="card p-4">
         <h2 class="mb-3 text-sm font-semibold">Response &amp; resolution</h2>
-        <div class="grid grid-cols-2 gap-4 sm:grid-cols-4">
+        <div class="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
             <div>
                 <div class="text-xs text-fg-muted">Avg first response <span class="text-fg-subtle">({{ $report['metrics']['first_response_measured'] }})</span></div>
                 <div class="text-lg font-medium">{{ $report['metrics']['first_response_avg_human'] }}</div>
             </div>
             <div>
-                <div class="text-xs text-fg-muted">Avg resolution <span class="text-fg-subtle">({{ $report['metrics']['resolution_measured'] }})</span></div>
+                <div class="text-xs text-fg-muted">Avg resolution (MTTR) <span class="text-fg-subtle">({{ $report['metrics']['resolution_measured'] }})</span></div>
                 <div class="text-lg font-medium">{{ $report['metrics']['resolution_avg_human'] }}</div>
             </div>
             <div>
@@ -176,6 +176,14 @@ new #[Layout('components.layouts.app')] #[Title('Reports')] class extends Compon
                 <div class="text-xs text-fg-muted">Avg time to close <span class="text-fg-subtle">({{ $report['metrics']['closure_measured'] }})</span></div>
                 <div class="text-lg font-medium">{{ $report['metrics']['closure_avg_human'] }}</div>
             </div>
+            <div>
+                <div class="text-xs text-fg-muted">Reopen rate <span class="text-fg-subtle">({{ $report['metrics']['reopened'] }})</span></div>
+                <div class="text-lg font-medium">{{ $report['metrics']['reopen_rate'] }}%</div>
+            </div>
+            <div>
+                <div class="text-xs text-fg-muted">CSAT avg <span class="text-fg-subtle">({{ $report['metrics']['csat_count'] }})</span></div>
+                <div class="text-lg font-medium">{{ $report['metrics']['csat_avg'] === null ? '—' : $report['metrics']['csat_avg'].' / 5' }}</div>
+            </div>
         </div>
     </div>
 
@@ -183,12 +191,18 @@ new #[Layout('components.layouts.app')] #[Title('Reports')] class extends Compon
         {{-- Status distribution --}}
         <div class="card p-4">
             <h2 class="mb-3 text-sm font-semibold">By status</h2>
+            @php($statusMax = max(1, collect($report['by_status'])->max('count')))
             <table class="w-full text-sm">
                 <tbody class="divide-y divide-border">
                     @foreach ($report['by_status'] as $row)
                         <tr>
-                            <td class="py-1.5">{{ $row['status']->label() }}</td>
-                            <td class="py-1.5 text-right tabular-nums">{{ $row['count'] }}</td>
+                            <td class="py-1.5 whitespace-nowrap pr-2">{{ $row['status']->label() }}</td>
+                            <td class="w-full py-1.5">
+                                <div class="h-2 rounded bg-surface-muted">
+                                    <div class="h-2 rounded bg-accent" style="width: {{ (int) round($row['count'] / $statusMax * 100) }}%"></div>
+                                </div>
+                            </td>
+                            <td class="py-1.5 pl-2 text-right tabular-nums">{{ $row['count'] }}</td>
                         </tr>
                     @endforeach
                 </tbody>
@@ -213,12 +227,18 @@ new #[Layout('components.layouts.app')] #[Title('Reports')] class extends Compon
         {{-- By category --}}
         <div class="card p-4">
             <h2 class="mb-3 text-sm font-semibold">By category</h2>
+            @php($categoryMax = max(1, collect($report['by_category'])->max('count')))
             <table class="w-full text-sm">
                 <tbody class="divide-y divide-border">
                     @forelse ($report['by_category'] as $row)
                         <tr>
-                            <td class="py-1.5">{{ $row['category'] }}</td>
-                            <td class="py-1.5 text-right tabular-nums">{{ $row['count'] }}</td>
+                            <td class="py-1.5 whitespace-nowrap pr-2">{{ $row['category'] }}</td>
+                            <td class="w-full py-1.5">
+                                <div class="h-2 rounded bg-surface-muted">
+                                    <div class="h-2 rounded bg-accent" style="width: {{ (int) round($row['count'] / $categoryMax * 100) }}%"></div>
+                                </div>
+                            </td>
+                            <td class="py-1.5 pl-2 text-right tabular-nums">{{ $row['count'] }}</td>
                         </tr>
                     @empty
                         <tr><td class="py-2 text-fg-muted">No data.</td></tr>

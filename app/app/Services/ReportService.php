@@ -92,6 +92,13 @@ class ReportService
 
         $resolvedOrClosed = $tickets->whereIn('status', [TicketStatus::Resolved, TicketStatus::Closed])->count();
 
+        // Reopen: a ticket that was resolved at some point (resolved_at set) but has
+        // since fallen back to a live status. Rate is over the tickets ever resolved.
+        $everResolved = $tickets->whereNotNull('resolved_at');
+        $reopened = $everResolved->reject(fn (Ticket $t) => in_array($t->status, [TicketStatus::Resolved, TicketStatus::Closed], true))->count();
+
+        $ratings = $tickets->whereNotNull('rating')->map(fn (Ticket $t) => (int) $t->rating);
+
         return [
             'first_response_avg_minutes' => $this->avg($firstResponse),
             'first_response_measured' => count($firstResponse),
@@ -101,6 +108,10 @@ class ReportService
             'closure_avg_minutes' => $this->avg($closure),
             'closure_measured' => count($closure),
             'resolution_rate' => $tickets->isEmpty() ? 0.0 : round($resolvedOrClosed / $tickets->count() * 100, 1),
+            'reopened' => $reopened,
+            'reopen_rate' => $everResolved->isEmpty() ? 0.0 : round($reopened / $everResolved->count() * 100, 1),
+            'csat_avg' => $ratings->isEmpty() ? null : round($ratings->avg(), 2),
+            'csat_count' => $ratings->count(),
         ];
     }
 
@@ -261,6 +272,8 @@ class ReportService
                 'resolved_at' => $this->stamp($t->resolved_at),
                 'closed_at' => $this->stamp($t->closed_at),
                 'resolution_minutes' => $t->resolved_at ? (int) round($t->created_at->diffInMinutes($t->resolved_at)) : null,
+                'rating' => $t->rating,
+                'rating_comment' => $t->rating_comment,
             ])
             ->all();
     }

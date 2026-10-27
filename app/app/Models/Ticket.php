@@ -33,6 +33,10 @@ class Ticket extends Model
         'closed_at',
         'response_due_at',
         'resolve_due_at',
+        // Requester satisfaction captured at resolve/close (CSAT, Phase 6).
+        'rating',
+        'rating_comment',
+        'rated_at',
         // Self-declared requester snapshot for public, no-login submissions.
         'requester_name',
         'requester_contact',
@@ -55,6 +59,8 @@ class Ticket extends Model
             'closed_at' => 'datetime',
             'response_due_at' => 'datetime',
             'resolve_due_at' => 'datetime',
+            'rating' => 'integer',
+            'rated_at' => 'datetime',
         ];
     }
 
