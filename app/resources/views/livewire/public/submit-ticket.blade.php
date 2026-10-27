@@ -117,11 +117,11 @@ new #[Layout('components.layouts.auth')] #[Title('Submit a Ticket')] class exten
     }
 }; ?>
 
-<div class="mx-auto w-full max-w-xl">
+<div class="w-full">
     @if ($ticketNumber)
-        <div class="rounded-xl border border-green-200 bg-green-50 p-6 text-center dark:border-green-800 dark:bg-green-950">
-            <div class="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-green-100 dark:bg-green-900">
-                <svg class="h-6 w-6 text-green-600 dark:text-green-300" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>
+        <div class="rounded-xl border border-green-200 bg-green-50 p-6 text-center dark:border-green-900 dark:bg-green-950/40">
+            <div class="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-green-100 text-green-600 dark:bg-green-900 dark:text-green-300">
+                <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>
             </div>
             <h1 class="text-lg font-semibold text-green-800 dark:text-green-200">Request received</h1>
             <p class="mt-1 text-sm text-green-700 dark:text-green-300">Your ticket number is</p>
@@ -130,12 +130,12 @@ new #[Layout('components.layouts.auth')] #[Title('Submit a Ticket')] class exten
             <flux:button wire:click="again" variant="subtle" class="mt-4">Submit another request</flux:button>
         </div>
     @else
-        <div class="mb-5 text-center">
-            <h1 class="text-2xl font-semibold">Submit an IT request</h1>
-            <p class="mt-1 text-sm text-zinc-500 dark:text-zinc-400">No account needed. Fill this in and IT will get back to you.</p>
+        <div class="mb-6 text-center">
+            <h1 class="text-2xl font-semibold tracking-tight">Submit an IT request</h1>
+            <p class="mt-1 text-sm text-fg-muted">No account needed. Fill this in and IT will get back to you.</p>
         </div>
 
-        <form wire:submit="submit" class="flex flex-col gap-4 rounded-xl border border-zinc-200 bg-white p-5 dark:border-zinc-700 dark:bg-zinc-900">
+        <form wire:submit="submit" class="flex flex-col gap-4">
             <flux:input wire:model="name" label="Your name" placeholder="Full name" />
 
             <div>
@@ -170,7 +170,7 @@ new #[Layout('components.layouts.auth')] #[Title('Submit a Ticket')] class exten
             </div>
 
             <div class="flex items-center justify-end pt-1">
-                <flux:button type="submit" variant="primary" wire:loading.attr="disabled">Submit request</flux:button>
+                <flux:button type="submit" variant="primary" class="w-full justify-center" wire:loading.attr="disabled">Submit request</flux:button>
             </div>
         </form>
     @endif

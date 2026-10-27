@@ -53,11 +53,8 @@ new #[Layout('components.layouts.app')] #[Title('Relink Approvals')] class exten
     }
 }; ?>
 
-<div class="flex flex-col gap-4">
-    <div>
-        <h1 class="text-xl font-semibold">Number-Relink Approvals</h1>
-        <p class="text-sm text-zinc-500 dark:text-zinc-400">Registered employees writing in from a new number via REGISTER (PRD §9.3)</p>
-    </div>
+<div class="flex flex-col gap-5">
+    <x-page.header title="Number-Relink Approvals" subtitle="Registered employees writing in from a new number via REGISTER" />
 
     @if (session('success'))
         <div class="rounded-lg bg-green-50 p-3 text-sm text-green-700 dark:bg-green-950 dark:text-green-300">{{ session('success') }}</div>
@@ -66,17 +63,17 @@ new #[Layout('components.layouts.app')] #[Title('Relink Approvals')] class exten
         <div class="rounded-lg bg-red-50 p-3 text-sm text-red-700 dark:bg-red-950 dark:text-red-300">{{ session('error') }}</div>
     @endif
 
-    <div class="rounded-xl border border-zinc-200 bg-white dark:border-zinc-700 dark:bg-zinc-900">
-        <div class="border-b border-zinc-200 px-4 py-3 dark:border-zinc-700">
+    <div class="card">
+        <div class="border-b border-border px-4 py-3">
             <h2 class="text-sm font-semibold">Pending ({{ $pending->count() }})</h2>
         </div>
 
-        <div class="divide-y divide-zinc-200 dark:divide-zinc-700">
+        <div class="divide-y divide-border">
             @forelse ($pending as $request)
                 <div class="flex flex-wrap items-center gap-3 p-4">
                     <div class="grow">
                         <div class="text-sm font-medium">{{ $request->requested_number }}</div>
-                        <div class="text-xs text-zinc-500 dark:text-zinc-400">Requested {{ $request->created_at->format('Y-m-d H:i') }}</div>
+                        <div class="text-xs text-fg-muted">Requested {{ $request->created_at->format('Y-m-d H:i') }}</div>
                     </div>
                     <flux:select wire:model="assign.{{ $request->id }}" placeholder="Link to employee…" class="w-56">
                         @foreach ($employees as $employee)
@@ -87,21 +84,21 @@ new #[Layout('components.layouts.app')] #[Title('Relink Approvals')] class exten
                     <flux:button size="sm" variant="subtle" wire:click="reject({{ $request->id }})">Reject</flux:button>
                 </div>
             @empty
-                <div class="p-8 text-center text-sm text-zinc-500 dark:text-zinc-400">No pending relink requests.</div>
+                <div class="p-8 text-center text-sm text-fg-muted">No pending relink requests.</div>
             @endforelse
         </div>
     </div>
 
     @if ($decided->isNotEmpty())
-        <div class="rounded-xl border border-zinc-200 bg-white dark:border-zinc-700 dark:bg-zinc-900">
-            <div class="border-b border-zinc-200 px-4 py-3 dark:border-zinc-700">
+        <div class="card">
+            <div class="border-b border-border px-4 py-3">
                 <h2 class="text-sm font-semibold">Recent decisions</h2>
             </div>
-            <div class="divide-y divide-zinc-200 dark:divide-zinc-700">
+            <div class="divide-y divide-border">
                 @foreach ($decided as $request)
                     <div class="flex items-center gap-3 p-4 text-sm">
                         <span class="grow">{{ $request->requested_number }}</span>
-                        <span class="text-zinc-500 dark:text-zinc-400">{{ $request->employee?->name ?? '—' }}</span>
+                        <span class="text-fg-muted">{{ $request->employee?->name ?? '—' }}</span>
                         <flux:badge :color="$request->status === 'approved' ? 'green' : 'zinc'" size="sm">{{ ucfirst($request->status) }}</flux:badge>
                     </div>
                 @endforeach

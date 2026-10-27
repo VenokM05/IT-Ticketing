@@ -425,7 +425,7 @@ Reopening a Closed ticket, if required, must be implemented as an explicit autho
 | Backend | Laravel |
 | Language | PHP |
 | Database | MySQL |
-| Dashboard | Blade, Livewire, Tailwind CSS |
+| Dashboard | Blade, Livewire, Tailwind CSS v4 + Flux UI (design-token layer, see 6.1.1) |
 | WhatsApp | Meta WhatsApp Business Platform Cloud API |
 | Queue | Laravel Queue |
 | Initial queue driver | Database |
@@ -438,6 +438,23 @@ Reopening a Closed ticket, if required, must be implemented as an explicit autho
 | File storage | Private storage for attachments and reports |
 
 The Laravel and PHP versions must be selected together based on supported versions at implementation time.
+
+#### 6.1.1 UI/UX design system (implemented)
+
+The dashboard and public pages share a semantic design-token layer defined in `resources/css/app.css`:
+
+- **Theme**: Light mode is the default for first-time visitors (seeded once into Flux's appearance store so an
+  explicit later "System" choice is never overwritten). A header sun/moon toggle flips Light ↔ Dark instantly and
+  persists the choice; the Settings > Appearance page keeps the Light/Dark/System control and drives the same store.
+- **Palette**: cool slate neutral ramp with an indigo accent; semantic tokens (`canvas`, `surface`, `surface-muted`,
+  `border`, `fg`, `fg-muted`, `fg-subtle`, `accent`) with dedicated dark-mode overrides, so components never
+  hard-code raw color scales.
+- **Layout**: responsive app shell (stashable sidebar, mobile top bar) with one grouped navigation;
+  every primary action (new request, tickets, notifications, employees, companies, approvals, reports) is
+  reachable within two clicks from the dashboard, and "New request" is a one-click sidebar button for admins.
+- **Consistency**: shared `card` surface utility, a reusable `x-page.header` masthead on every page, consistent
+  spacing/typography scale, `tap` minimum target height (44px) for touch screens, and AA-oriented contrast
+  via `fg`/`fg-muted` token pairs on both themes.
 
 ### 6.2 Application Structure
 
@@ -1420,7 +1437,7 @@ The system must preserve ticket history, process webhook events safely, handle m
 | WhatsApp integration | Meta WhatsApp Cloud API |
 | Backend | Laravel |
 | Database | MySQL |
-| Dashboard | Blade, Livewire and Tailwind CSS |
+| Dashboard | Blade, Livewire, Tailwind CSS v4 and Flux UI (token-based design system) |
 | Admin notification | Live dashboard only |
 | Employee notification | WhatsApp for important status changes |
 | Outbound messaging | Section 11 session-window and approved-template strategy |
@@ -1433,5 +1450,6 @@ The system must preserve ticket history, process webhook events safely, handle m
 | Initial live updates | Livewire polling |
 | Optional real-time enhancement | Laravel Reverb/WebSockets |
 | Security | Authentication, policies, webhook signature validation and private storage |
+| UI theme | Light mode by default, user-toggleable Light/Dark (header toggle) + System option in Settings |
 
 **Document Status:** Approved for technical implementation planning.

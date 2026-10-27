@@ -66,34 +66,34 @@ new class extends Component {
             <div class="flex items-center justify-between px-1 py-1.5">
                 <span class="text-sm font-semibold">Notifications</span>
                 @if ($this->unreadCount() > 0)
-                    <button wire:click="markAllRead" class="text-xs text-blue-600 hover:underline dark:text-blue-400">Mark all read</button>
+                    <button wire:click="markAllRead" class="text-xs text-accent-content hover:underline">Mark all read</button>
                 @endif
             </div>
             <flux:menu.separator />
 
             @forelse ($this->recent() as $notification)
                 <div class="flex items-start gap-2 px-1 py-1.5">
-                    <span class="mt-1.5 size-2 shrink-0 rounded-full {{ $notification->isUnread() ? 'bg-blue-500' : 'bg-zinc-300 dark:bg-zinc-600' }}"></span>
+                    <span class="mt-1.5 size-2 shrink-0 rounded-full {{ $notification->isUnread() ? 'bg-accent' : 'bg-border' }}"></span>
                     <div class="min-w-0 flex-1">
                         @if ($notification->ticket)
-                            <a href="{{ route('tickets.show', $notification->ticket) }}" wire:navigate class="block truncate text-sm {{ $notification->isUnread() ? 'font-medium' : 'text-zinc-600 dark:text-zinc-400' }}">
+                            <a href="{{ route('tickets.show', $notification->ticket) }}" wire:navigate class="block truncate text-sm {{ $notification->isUnread() ? 'font-medium' : 'text-fg-muted' }}">
                                 {{ $notification->title }}
                             </a>
                         @else
-                            <span class="block truncate text-sm {{ $notification->isUnread() ? 'font-medium' : 'text-zinc-600 dark:text-zinc-400' }}">{{ $notification->title }}</span>
+                            <span class="block truncate text-sm {{ $notification->isUnread() ? 'font-medium' : 'text-fg-muted' }}">{{ $notification->title }}</span>
                         @endif
-                        <span class="block text-xs text-zinc-400 dark:text-zinc-500">{{ $notification->created_at->diffForHumans() }}</span>
+                        <span class="block text-xs text-fg-subtle">{{ $notification->created_at->diffForHumans() }}</span>
                     </div>
                     @if ($notification->isUnread())
-                        <button wire:click="markRead({{ $notification->id }})" class="text-xs text-blue-600 hover:underline dark:text-blue-400">Read</button>
+                        <button wire:click="markRead({{ $notification->id }})" class="text-xs text-accent-content hover:underline">Read</button>
                     @endif
                 </div>
             @empty
-                <div class="px-1 py-3 text-center text-sm text-zinc-500 dark:text-zinc-400">No notifications yet.</div>
+                <div class="px-1 py-3 text-center text-sm text-fg-muted">No notifications yet.</div>
             @endforelse
 
             <flux:menu.separator />
-            <a href="{{ route('notifications') }}" wire:navigate class="block px-1 py-1.5 text-center text-sm text-blue-600 hover:underline dark:text-blue-400">
+            <a href="{{ route('notifications') }}" wire:navigate class="block px-1 py-1.5 text-center text-sm text-accent-content hover:underline">
                 View all notifications
             </a>
         </flux:menu>

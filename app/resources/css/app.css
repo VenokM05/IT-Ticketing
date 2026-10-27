@@ -8,43 +8,125 @@
 
 @custom-variant dark (&:where(.dark, .dark *));
 
+/*
+| ----------------------------------------------------------------------------
+|  Design tokens
+| ----------------------------------------------------------------------------
+|  A single source of truth for colour, radius and typography. Every surface,
+|  border and text colour in the app resolves through these semantic tokens, so
+|  the light/dark themes are just two value-sets for the same names. The neutral
+|  scale is remapped to a cool slate ramp (reads more "professional software"
+|  than zinc) and the accent to indigo, so existing markup that still references
+|  zinc-* / accent picks up the new identity automatically.
+| --------------------------------------------------------------------------
+*/
 @theme {
     --font-sans: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
 
-    --color-zinc-50: #fafafa;
-    --color-zinc-100: #f5f5f5;
-    --color-zinc-200: #e5e5e5;
-    --color-zinc-300: #d4d4d4;
-    --color-zinc-400: #a3a3a3;
-    --color-zinc-500: #737373;
-    --color-zinc-600: #525252;
-    --color-zinc-700: #404040;
-    --color-zinc-800: #262626;
-    --color-zinc-900: #171717;
-    --color-zinc-950: #0a0a0a;
+    /* Neutral ramp — cool slate, used as the backbone of both themes. */
+    --color-zinc-50: #f8fafc;
+    --color-zinc-100: #f1f5f9;
+    --color-zinc-200: #e2e8f0;
+    --color-zinc-300: #cbd5e1;
+    --color-zinc-400: #94a3b8;
+    --color-zinc-500: #64748b;
+    --color-zinc-600: #475569;
+    --color-zinc-700: #334155;
+    --color-zinc-800: #1e293b;
+    --color-zinc-900: #0f172a;
+    --color-zinc-950: #020617;
 
-    --color-accent: var(--color-neutral-800);
-    --color-accent-content: var(--color-neutral-800);
-    --color-accent-foreground: var(--color-white);
+    /* Brand accent (indigo) — primary buttons, active nav, focus rings, links. */
+    --color-accent: var(--color-indigo-600);
+    --color-accent-content: var(--color-indigo-600);
+    --color-accent-foreground: #ffffff;
+
+    /* Semantic surfaces & text. Utilities auto-generate: bg-surface, text-fg, ... */
+    --color-canvas: #f1f5f9;           /* app background behind cards */
+    --color-surface: #ffffff;          /* cards, panels, tables */
+    --color-surface-muted: #f8fafc;    /* table heads, inset blocks */
+    --color-border: #e2e8f0;           /* default hairline */
+    --color-border-strong: #cbd5e1;    /* emphasized dividers */
+    --color-fg: #0f172a;               /* primary text */
+    --color-fg-muted: #475569;         /* secondary text (AA on white) */
+    --color-fg-subtle: #64748b;        /* tertiary / captions */
+
+    --radius-card: 0.875rem;
 }
 
 @layer theme {
     .dark {
-        --color-accent: var(--color-white);
-        --color-accent-content: var(--color-white);
-        --color-accent-foreground: var(--color-neutral-800);
+        --color-accent: var(--color-indigo-400);
+        --color-accent-content: var(--color-indigo-400);
+        --color-accent-foreground: #0b1220;
+
+        --color-canvas: #020617;
+        --color-surface: #0f172a;
+        --color-surface-muted: #111d33;
+        --color-border: #1e293b;
+        --color-border-strong: #334155;
+        --color-fg: #e2e8f0;
+        --color-fg-muted: #a3aec0;
+        --color-fg-subtle: #8592a6;
     }
 }
 
 @layer base {
-
     *,
     ::after,
     ::before,
     ::backdrop,
     ::file-selector-button {
-        border-color: var(--color-gray-200, currentColor);
+        border-color: var(--color-border, currentColor);
     }
+
+    html {
+        -webkit-text-size-adjust: 100%;
+    }
+
+    body {
+        background-color: var(--color-canvas);
+        color: var(--color-fg);
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
+        font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
+    }
+
+    /* Keep the browser form-autofill from punching a white box in dark mode. */
+    input:-webkit-autofill,
+    textarea:-webkit-autofill {
+        -webkit-box-shadow: 0 0 0 1000px var(--color-surface) inset;
+        -webkit-text-fill-color: var(--color-fg);
+    }
+}
+
+/*
+| Reusable presentation primitives. Pages compose these instead of re-declaring
+| long utility chains, which keeps spacing, radius and elevation consistent.
+*/
+@utility card {
+    background-color: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-card);
+}
+
+@utility panel {
+    background-color: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-card);
+    padding: 1rem 1.25rem;
+}
+
+@utility text-link {
+    color: var(--color-accent);
+    text-underline-offset: 2px;
+
+    &:hover { text-decoration-line: underline; }
+}
+
+/* A comfortable minimum tap target for primary touch actions on small screens. */
+@utility tap {
+    min-height: 2.75rem;
 }
 
 [data-flux-field] {
@@ -52,13 +134,24 @@
 }
 
 [data-flux-label] {
-    @apply  !mb-0 !leading-tight;
+    @apply !mb-0 !leading-tight;
 }
 
 input:focus[data-flux-control],
 textarea:focus[data-flux-control],
 select:focus[data-flux-control] {
-    @apply outline-hidden ring-2 ring-accent ring-offset-2 ring-offset-accent-foreground;
+    @apply outline-hidden ring-2 ring-accent ring-offset-2 ring-offset-surface;
+}
+
+/* Respect users who ask for reduced motion. */
+@media (prefers-reduced-motion: reduce) {
+    *,
+    ::before,
+    ::after {
+        animation-duration: 0.01ms !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+    }
 }
 
 /* \[:where(&)\]:size-4 {

@@ -80,21 +80,17 @@ new #[Layout('components.layouts.app')] #[Title('Tickets')] class extends Compon
     }
 }; ?>
 
-<div class="flex flex-col gap-4">
-    <div class="flex items-center justify-between">
-        <div>
-            <h1 class="text-xl font-semibold">Tickets</h1>
-            <p class="text-sm text-zinc-500 dark:text-zinc-400">
-                {{ auth()->user()->isAdmin() ? 'All tickets' : 'Your assigned tickets' }}
-            </p>
-        </div>
+<div class="flex flex-col gap-5">
+    <x-page.header title="Tickets" :subtitle="auth()->user()->isAdmin() ? 'All tickets' : 'Your assigned tickets'">
         @if (auth()->user()->can('create', Ticket::class))
-            <flux:button :href="route('tickets.create')" variant="primary" icon="plus" wire:navigate>New Ticket</flux:button>
+            <x-slot:actions>
+                <flux:button :href="route('tickets.create')" variant="primary" icon="plus" wire:navigate>New Ticket</flux:button>
+            </x-slot:actions>
         @endif
-    </div>
+    </x-page.header>
 
     {{-- Search + filters (§10.2) --}}
-    <div class="grid grid-cols-2 gap-3 rounded-xl border border-zinc-200 bg-white p-4 dark:border-zinc-700 dark:bg-zinc-900 sm:grid-cols-3 lg:grid-cols-7">
+    <div class="grid grid-cols-2 gap-3 card p-4 sm:grid-cols-3 lg:grid-cols-7">
         <div class="col-span-2 sm:col-span-1 lg:col-span-2">
             <flux:input wire:model.live.debounce.400ms="search" placeholder="Search number / subject…" icon="magnifying-glass" />
         </div>
@@ -135,29 +131,29 @@ new #[Layout('components.layouts.app')] #[Title('Tickets')] class extends Compon
         <flux:button wire:click="clear" variant="subtle">Clear</flux:button>
     </div>
 
-    <div class="overflow-hidden rounded-xl border border-zinc-200 dark:border-zinc-700">
+    <div class="card overflow-hidden">
         <div class="overflow-x-auto">
             <table class="w-full text-sm">
-                <thead class="bg-zinc-50 text-left dark:bg-zinc-800/50">
+                <thead class="bg-surface-muted text-left">
                     <tr>
-                        <th class="px-4 py-2 font-medium text-zinc-500 dark:text-zinc-400">Ticket</th>
-                        <th class="px-4 py-2 font-medium text-zinc-500 dark:text-zinc-400">Requester</th>
-                        <th class="px-4 py-2 font-medium text-zinc-500 dark:text-zinc-400">Company</th>
-                        <th class="px-4 py-2 font-medium text-zinc-500 dark:text-zinc-400">Category</th>
-                        <th class="px-4 py-2 font-medium text-zinc-500 dark:text-zinc-400">Priority</th>
-                        <th class="px-4 py-2 font-medium text-zinc-500 dark:text-zinc-400">Status</th>
-                        <th class="px-4 py-2 font-medium text-zinc-500 dark:text-zinc-400">Technician</th>
-                        <th class="px-4 py-2 font-medium text-zinc-500 dark:text-zinc-400">Created</th>
+                        <th class="px-4 py-2 font-medium text-fg-subtle">Ticket</th>
+                        <th class="px-4 py-2 font-medium text-fg-subtle">Requester</th>
+                        <th class="px-4 py-2 font-medium text-fg-subtle">Company</th>
+                        <th class="px-4 py-2 font-medium text-fg-subtle">Category</th>
+                        <th class="px-4 py-2 font-medium text-fg-subtle">Priority</th>
+                        <th class="px-4 py-2 font-medium text-fg-subtle">Status</th>
+                        <th class="px-4 py-2 font-medium text-fg-subtle">Technician</th>
+                        <th class="px-4 py-2 font-medium text-fg-subtle">Created</th>
                     </tr>
                 </thead>
-                <tbody class="divide-y divide-zinc-200 dark:divide-zinc-700">
+                <tbody class="divide-y divide-border">
                     @forelse ($tickets as $ticket)
                         <tr>
                             <td class="px-4 py-2">
-                                <a href="{{ route('tickets.show', $ticket) }}" wire:navigate class="font-medium text-blue-600 hover:underline dark:text-blue-400">
+                                <a href="{{ route('tickets.show', $ticket) }}" wire:navigate class="font-medium text-accent-content hover:underline">
                                     {{ $ticket->ticket_number }}
                                 </a>
-                                <div class="text-zinc-500 dark:text-zinc-400">{{ $ticket->subject }}</div>
+                                <div class="text-fg-muted">{{ $ticket->subject }}</div>
                             </td>
                             <td class="px-4 py-2">{{ $ticket->requesterName() ?? '—' }}</td>
                             <td class="px-4 py-2">{{ $ticket->companyLabel() }}</td>
@@ -165,11 +161,11 @@ new #[Layout('components.layouts.app')] #[Title('Tickets')] class extends Compon
                             <td class="px-4 py-2"><flux:badge :color="match ($ticket->priority) { \App\Enums\TicketPriority::Critical => 'red', \App\Enums\TicketPriority::High => 'orange', default => 'zinc' }" size="sm">{{ $ticket->priority->label() }}</flux:badge></td>
                             <td class="px-4 py-2"><flux:badge :color="match ($ticket->status) { \App\Enums\TicketStatus::Closed => 'zinc', \App\Enums\TicketStatus::Resolved => 'green', \App\Enums\TicketStatus::InProgress => 'blue', \App\Enums\TicketStatus::Pending => 'amber', default => 'purple' }" size="sm">{{ $ticket->status->label() }}</flux:badge></td>
                             <td class="px-4 py-2">{{ $ticket->assignee?->name ?? 'Unassigned' }}</td>
-                            <td class="px-4 py-2 whitespace-nowrap text-zinc-500 dark:text-zinc-400">{{ $ticket->created_at->format('Y-m-d H:i') }}</td>
+                            <td class="px-4 py-2 whitespace-nowrap text-fg-muted">{{ $ticket->created_at->format('Y-m-d H:i') }}</td>
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="8" class="px-4 py-8 text-center text-zinc-500 dark:text-zinc-400">No tickets match your filters.</td>
+                            <td colspan="8" class="px-4 py-8 text-center text-fg-muted">No tickets match your filters.</td>
                         </tr>
                     @endforelse
                 </tbody>
@@ -177,7 +173,7 @@ new #[Layout('components.layouts.app')] #[Title('Tickets')] class extends Compon
         </div>
 
         @if ($tickets->hasPages())
-            <div class="border-t border-zinc-200 px-4 py-3 dark:border-zinc-700">
+            <div class="border-t border-border px-4 py-3">
                 {{ $tickets->links() }}
             </div>
         @endif

@@ -82,13 +82,10 @@ new #[Layout('components.layouts.app')] #[Title('Submit Ticket')] class extends 
     }
 }; ?>
 
-<div class="mx-auto w-full max-w-2xl flex flex-col gap-4">
-    <div>
-        <h1 class="text-xl font-semibold">Submit a Ticket</h1>
-        <p class="text-sm text-zinc-500 dark:text-zinc-400">Log an IT issue on behalf of an employee (walk-in, phone or email).</p>
-    </div>
+<div class="mx-auto w-full max-w-2xl flex flex-col gap-5">
+    <x-page.header title="Submit a Ticket" subtitle="Log an IT issue on behalf of an employee (walk-in, phone or email)." />
 
-    <form wire:submit="submit" class="flex flex-col gap-4 rounded-xl border border-zinc-200 bg-white p-5 dark:border-zinc-700 dark:bg-zinc-900">
+    <form wire:submit="submit" class="card flex flex-col gap-4 p-5">
         <flux:select wire:model.live="employeeId" label="Employee" placeholder="Select employee…">
             <flux:select.option value="">Select employee…</flux:select.option>
             @foreach ($employees as $employee)
@@ -100,7 +97,7 @@ new #[Layout('components.layouts.app')] #[Title('Submit Ticket')] class extends 
 
         @if ($requester)
             {{-- The company is inherited from the employee's enrollment, not chosen here. --}}
-            <div class="-mt-2 rounded-lg border border-zinc-200 bg-zinc-50 p-3 text-xs text-zinc-600 dark:border-zinc-700 dark:bg-zinc-800/50 dark:text-zinc-300">
+            <div class="-mt-2 rounded-lg border border-border bg-surface-muted p-3 text-xs text-fg-muted">
                 <span class="font-semibold">Company:</span>
                 {{ $requester->company?->name ?? 'Not set — assign a company in the Employee Directory' }}
                 <span class="mx-1">·</span>

@@ -192,14 +192,12 @@ new #[Layout('components.layouts.app')] #[Title('Employee Directory')] class ext
     }
 }; ?>
 
-<div class="flex flex-col gap-4">
-    <div class="flex flex-wrap items-center justify-between gap-2">
-        <div>
-            <h1 class="text-xl font-semibold">Employee Directory</h1>
-            <p class="text-sm text-zinc-500 dark:text-zinc-400">Registration management (PRD §10.7)</p>
-        </div>
-        <flux:button wire:click="startCreate" variant="primary" icon="plus">New employee</flux:button>
-    </div>
+<div class="flex flex-col gap-5">
+    <x-page.header title="Employee Directory" subtitle="Registration management">
+        <x-slot:actions>
+            <flux:button wire:click="startCreate" variant="primary" icon="plus">New employee</flux:button>
+        </x-slot:actions>
+    </x-page.header>
 
     @if (session('success'))
         <div class="rounded-lg bg-green-50 p-3 text-sm text-green-700 dark:bg-green-950 dark:text-green-300">{{ session('success') }}</div>
@@ -210,7 +208,7 @@ new #[Layout('components.layouts.app')] #[Title('Employee Directory')] class ext
 
     {{-- Create / edit form --}}
     @if ($showForm)
-        <div class="rounded-xl border border-zinc-200 bg-white p-4 dark:border-zinc-700 dark:bg-zinc-900">
+        <div class="card p-4">
             <h2 class="text-sm font-semibold">{{ $editingId ? 'Edit employee' : 'New employee' }}</h2>
             <div class="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                 <flux:input wire:model="fName" label="Name" placeholder="Full name" />
@@ -238,9 +236,9 @@ new #[Layout('components.layouts.app')] #[Title('Employee Directory')] class ext
     @endif
 
     {{-- CSV import (§9.1) --}}
-    <div class="rounded-xl border border-zinc-200 bg-white p-4 dark:border-zinc-700 dark:bg-zinc-900">
+    <div class="card p-4">
         <h2 class="text-sm font-semibold">Bulk CSV import</h2>
-        <p class="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+        <p class="mt-1 text-xs text-fg-muted">
             Columns: <code>name, whatsapp_number, department, company, position, location, email, is_active</code>.
             Departments and companies must already exist; the import fails and reports any unmapped value rather than creating ad-hoc ones.
         </p>
@@ -272,7 +270,7 @@ new #[Layout('components.layouts.app')] #[Title('Employee Directory')] class ext
     </div>
 
     {{-- Filters --}}
-    <div class="grid gap-3 rounded-xl border border-zinc-200 bg-white p-4 dark:border-zinc-700 dark:bg-zinc-900 sm:grid-cols-5">
+    <div class="grid gap-3 card p-4 sm:grid-cols-5">
         <flux:input wire:model.live.debounce.400ms="search" placeholder="Search name / number / email" icon="magnifying-glass" class="sm:col-span-2" />
         <flux:select wire:model.live="companyId" placeholder="All companies">
             <flux:select.option value="">All companies</flux:select.option>
@@ -294,33 +292,33 @@ new #[Layout('components.layouts.app')] #[Title('Employee Directory')] class ext
     </div>
 
     {{-- Table --}}
-    <div class="overflow-hidden rounded-xl border border-zinc-200 dark:border-zinc-700">
+    <div class="card overflow-hidden">
         <div class="overflow-x-auto">
             <table class="w-full text-sm">
-                <thead class="bg-zinc-50 text-left dark:bg-zinc-800/50">
+                <thead class="bg-surface-muted text-left">
                     <tr>
-                        <th class="px-4 py-2 font-medium text-zinc-500 dark:text-zinc-400">Name</th>
-                        <th class="px-4 py-2 font-medium text-zinc-500 dark:text-zinc-400">WhatsApp</th>
-                        <th class="px-4 py-2 font-medium text-zinc-500 dark:text-zinc-400">Company</th>
-                        <th class="px-4 py-2 font-medium text-zinc-500 dark:text-zinc-400">Department</th>
-                        <th class="px-4 py-2 font-medium text-zinc-500 dark:text-zinc-400">Tickets</th>
-                        <th class="px-4 py-2 font-medium text-zinc-500 dark:text-zinc-400">Status</th>
-                        <th class="px-4 py-2 font-medium text-zinc-500 dark:text-zinc-400">Actions</th>
+                        <th class="px-4 py-2 font-medium text-fg-muted">Name</th>
+                        <th class="px-4 py-2 font-medium text-fg-muted">WhatsApp</th>
+                        <th class="px-4 py-2 font-medium text-fg-muted">Company</th>
+                        <th class="px-4 py-2 font-medium text-fg-muted">Department</th>
+                        <th class="px-4 py-2 font-medium text-fg-muted">Tickets</th>
+                        <th class="px-4 py-2 font-medium text-fg-muted">Status</th>
+                        <th class="px-4 py-2 font-medium text-fg-muted">Actions</th>
                     </tr>
                 </thead>
-                <tbody class="divide-y divide-zinc-200 dark:divide-zinc-700">
+                <tbody class="divide-y divide-border">
                     @forelse ($employees as $employee)
                         <tr>
                             <td class="px-4 py-2">
-                                <a href="{{ route('employees.show', $employee) }}" wire:navigate class="font-medium text-blue-600 hover:underline dark:text-blue-400">{{ $employee->name }}</a>
-                                <div class="text-xs text-zinc-500 dark:text-zinc-400">{{ $employee->email }}{{ $employee->location ? ' · '.$employee->location : '' }}</div>
+                                <a href="{{ route('employees.show', $employee) }}" wire:navigate class="font-medium text-accent-content hover:underline">{{ $employee->name }}</a>
+                                <div class="text-xs text-fg-muted">{{ $employee->email }}{{ $employee->location ? ' · '.$employee->location : '' }}</div>
                             </td>
                             <td class="px-4 py-2 whitespace-nowrap">{{ $employee->whatsapp_number }}</td>
                             <td class="px-4 py-2">{{ $employee->company?->name ?? '—' }}</td>
                             <td class="px-4 py-2">
                                 {{ $employee->department?->name ?? '—' }}
                                 @if ($employee->position)
-                                    <div class="text-xs text-zinc-500 dark:text-zinc-400">{{ $employee->position }}</div>
+                                    <div class="text-xs text-fg-muted">{{ $employee->position }}</div>
                                 @endif
                             </td>
                             <td class="px-4 py-2">{{ $employee->tickets_count }}</td>
@@ -333,14 +331,14 @@ new #[Layout('components.layouts.app')] #[Title('Employee Directory')] class ext
                             </td>
                         </tr>
                     @empty
-                        <tr><td colspan="7" class="px-4 py-8 text-center text-zinc-500 dark:text-zinc-400">No employees found.</td></tr>
+                        <tr><td colspan="7" class="px-4 py-8 text-center text-fg-muted">No employees found.</td></tr>
                     @endforelse
                 </tbody>
             </table>
         </div>
 
         @if ($employees->hasPages())
-            <div class="border-t border-zinc-200 px-4 py-3 dark:border-zinc-700">{{ $employees->links() }}</div>
+            <div class="border-t border-border px-4 py-3">{{ $employees->links() }}</div>
         @endif
     </div>
 </div>

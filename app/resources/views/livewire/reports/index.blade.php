@@ -89,17 +89,15 @@ new #[Layout('components.layouts.app')] #[Title('Reports')] class extends Compon
     }
 }; ?>
 
-<div class="flex flex-col gap-4">
-    <div class="flex items-center justify-between">
-        <div>
-            <h1 class="text-xl font-semibold">Reports</h1>
-            <p class="text-sm text-zinc-500 dark:text-zinc-400">Operational reporting and management exports (PRD Phase 6)</p>
-        </div>
-        <flux:button :href="route('reports.export', $exportQuery)" variant="primary" icon="arrow-down-tray" wire:navigate.off>Export CSV</flux:button>
-    </div>
+<div class="flex flex-col gap-5">
+    <x-page.header title="Reports" subtitle="Operational reporting and management exports">
+        <x-slot:actions>
+            <flux:button :href="route('reports.export', $exportQuery)" variant="primary" icon="arrow-down-tray" wire:navigate.off>Export CSV</flux:button>
+        </x-slot:actions>
+    </x-page.header>
 
     {{-- Filters (shared with the CSV export) --}}
-    <div class="grid grid-cols-2 gap-3 rounded-xl border border-zinc-200 bg-white p-4 dark:border-zinc-700 dark:bg-zinc-900 sm:grid-cols-3 lg:grid-cols-9">
+    <div class="grid grid-cols-2 gap-3 card p-4 sm:grid-cols-3 lg:grid-cols-9">
         <flux:input type="date" wire:model.live="from" label="From" />
         <flux:input type="date" wire:model.live="to" label="To" />
         <flux:select wire:model.live="status" placeholder="All statuses">
@@ -151,31 +149,31 @@ new #[Layout('components.layouts.app')] #[Title('Reports')] class extends Compon
             'Unassigned' => $report['totals']['unassigned'],
             'Resolution %' => $report['metrics']['resolution_rate'].'%',
         ] as $label => $value)
-            <div class="rounded-xl border border-zinc-200 bg-white p-4 dark:border-zinc-700 dark:bg-zinc-900">
-                <div class="text-xs text-zinc-500 dark:text-zinc-400">{{ $label }}</div>
+            <div class="card p-4">
+                <div class="text-xs text-fg-muted">{{ $label }}</div>
                 <div class="text-2xl font-semibold">{{ $value }}</div>
             </div>
         @endforeach
     </div>
 
     {{-- Response & resolution metrics --}}
-    <div class="rounded-xl border border-zinc-200 bg-white p-4 dark:border-zinc-700 dark:bg-zinc-900">
+    <div class="card p-4">
         <h2 class="mb-3 text-sm font-semibold">Response &amp; resolution</h2>
         <div class="grid grid-cols-2 gap-4 sm:grid-cols-4">
             <div>
-                <div class="text-xs text-zinc-500 dark:text-zinc-400">Avg first response <span class="text-zinc-400">({{ $report['metrics']['first_response_measured'] }})</span></div>
+                <div class="text-xs text-fg-muted">Avg first response <span class="text-fg-subtle">({{ $report['metrics']['first_response_measured'] }})</span></div>
                 <div class="text-lg font-medium">{{ $report['metrics']['first_response_avg_human'] }}</div>
             </div>
             <div>
-                <div class="text-xs text-zinc-500 dark:text-zinc-400">Avg resolution <span class="text-zinc-400">({{ $report['metrics']['resolution_measured'] }})</span></div>
+                <div class="text-xs text-fg-muted">Avg resolution <span class="text-fg-subtle">({{ $report['metrics']['resolution_measured'] }})</span></div>
                 <div class="text-lg font-medium">{{ $report['metrics']['resolution_avg_human'] }}</div>
             </div>
             <div>
-                <div class="text-xs text-zinc-500 dark:text-zinc-400">Slowest resolution</div>
+                <div class="text-xs text-fg-muted">Slowest resolution</div>
                 <div class="text-lg font-medium">{{ $report['metrics']['resolution_max_human'] }}</div>
             </div>
             <div>
-                <div class="text-xs text-zinc-500 dark:text-zinc-400">Avg time to close <span class="text-zinc-400">({{ $report['metrics']['closure_measured'] }})</span></div>
+                <div class="text-xs text-fg-muted">Avg time to close <span class="text-fg-subtle">({{ $report['metrics']['closure_measured'] }})</span></div>
                 <div class="text-lg font-medium">{{ $report['metrics']['closure_avg_human'] }}</div>
             </div>
         </div>
@@ -183,10 +181,10 @@ new #[Layout('components.layouts.app')] #[Title('Reports')] class extends Compon
 
     <div class="grid gap-4 lg:grid-cols-2">
         {{-- Status distribution --}}
-        <div class="rounded-xl border border-zinc-200 bg-white p-4 dark:border-zinc-700 dark:bg-zinc-900">
+        <div class="card p-4">
             <h2 class="mb-3 text-sm font-semibold">By status</h2>
             <table class="w-full text-sm">
-                <tbody class="divide-y divide-zinc-200 dark:divide-zinc-700">
+                <tbody class="divide-y divide-border">
                     @foreach ($report['by_status'] as $row)
                         <tr>
                             <td class="py-1.5">{{ $row['status']->label() }}</td>
@@ -198,10 +196,10 @@ new #[Layout('components.layouts.app')] #[Title('Reports')] class extends Compon
         </div>
 
         {{-- Priority distribution --}}
-        <div class="rounded-xl border border-zinc-200 bg-white p-4 dark:border-zinc-700 dark:bg-zinc-900">
+        <div class="card p-4">
             <h2 class="mb-3 text-sm font-semibold">By priority</h2>
             <table class="w-full text-sm">
-                <tbody class="divide-y divide-zinc-200 dark:divide-zinc-700">
+                <tbody class="divide-y divide-border">
                     @foreach ($report['by_priority'] as $row)
                         <tr>
                             <td class="py-1.5">{{ $row['priority']->label() }}</td>
@@ -213,30 +211,30 @@ new #[Layout('components.layouts.app')] #[Title('Reports')] class extends Compon
         </div>
 
         {{-- By category --}}
-        <div class="rounded-xl border border-zinc-200 bg-white p-4 dark:border-zinc-700 dark:bg-zinc-900">
+        <div class="card p-4">
             <h2 class="mb-3 text-sm font-semibold">By category</h2>
             <table class="w-full text-sm">
-                <tbody class="divide-y divide-zinc-200 dark:divide-zinc-700">
+                <tbody class="divide-y divide-border">
                     @forelse ($report['by_category'] as $row)
                         <tr>
                             <td class="py-1.5">{{ $row['category'] }}</td>
                             <td class="py-1.5 text-right tabular-nums">{{ $row['count'] }}</td>
                         </tr>
                     @empty
-                        <tr><td class="py-2 text-zinc-500 dark:text-zinc-400">No data.</td></tr>
+                        <tr><td class="py-2 text-fg-muted">No data.</td></tr>
                     @endforelse
                 </tbody>
             </table>
         </div>
 
         {{-- By company --}}
-        <div class="rounded-xl border border-zinc-200 bg-white p-4 dark:border-zinc-700 dark:bg-zinc-900">
+        <div class="card p-4">
             <h2 class="mb-3 text-sm font-semibold">By company</h2>
             <table class="w-full text-sm">
-                <thead class="text-left text-xs text-zinc-500 dark:text-zinc-400">
+                <thead class="text-left text-xs text-fg-muted">
                     <tr><th class="pb-1 font-medium">Company</th><th class="pb-1 text-right font-medium">Open</th><th class="pb-1 text-right font-medium">Resolved</th><th class="pb-1 text-right font-medium">Total</th></tr>
                 </thead>
-                <tbody class="divide-y divide-zinc-200 dark:divide-zinc-700">
+                <tbody class="divide-y divide-border">
                     @forelse ($report['by_company'] as $row)
                         <tr>
                             <td class="py-1.5">{{ $row['company'] }}</td>
@@ -245,20 +243,20 @@ new #[Layout('components.layouts.app')] #[Title('Reports')] class extends Compon
                             <td class="py-1.5 text-right tabular-nums">{{ $row['count'] }}</td>
                         </tr>
                     @empty
-                        <tr><td colspan="4" class="py-2 text-zinc-500 dark:text-zinc-400">No data.</td></tr>
+                        <tr><td colspan="4" class="py-2 text-fg-muted">No data.</td></tr>
                     @endforelse
                 </tbody>
             </table>
         </div>
 
         {{-- By department --}}
-        <div class="rounded-xl border border-zinc-200 bg-white p-4 dark:border-zinc-700 dark:bg-zinc-900">
+        <div class="card p-4">
             <h2 class="mb-3 text-sm font-semibold">By department</h2>
             <table class="w-full text-sm">
-                <thead class="text-left text-xs text-zinc-500 dark:text-zinc-400">
+                <thead class="text-left text-xs text-fg-muted">
                     <tr><th class="pb-1 font-medium">Department</th><th class="pb-1 text-right font-medium">Open</th><th class="pb-1 text-right font-medium">Total</th></tr>
                 </thead>
-                <tbody class="divide-y divide-zinc-200 dark:divide-zinc-700">
+                <tbody class="divide-y divide-border">
                     @forelse ($report['by_department'] as $row)
                         <tr>
                             <td class="py-1.5">{{ $row['department'] }}</td>
@@ -266,7 +264,7 @@ new #[Layout('components.layouts.app')] #[Title('Reports')] class extends Compon
                             <td class="py-1.5 text-right tabular-nums">{{ $row['count'] }}</td>
                         </tr>
                     @empty
-                        <tr><td colspan="3" class="py-2 text-zinc-500 dark:text-zinc-400">No data.</td></tr>
+                        <tr><td colspan="3" class="py-2 text-fg-muted">No data.</td></tr>
                     @endforelse
                 </tbody>
             </table>
@@ -274,11 +272,11 @@ new #[Layout('components.layouts.app')] #[Title('Reports')] class extends Compon
     </div>
 
     {{-- Technician workload --}}
-    <div class="rounded-xl border border-zinc-200 bg-white p-4 dark:border-zinc-700 dark:bg-zinc-900">
+    <div class="card p-4">
         <h2 class="mb-3 text-sm font-semibold">Technician workload</h2>
         <div class="overflow-x-auto">
             <table class="w-full text-sm">
-                <thead class="text-left text-xs text-zinc-500 dark:text-zinc-400">
+                <thead class="text-left text-xs text-fg-muted">
                     <tr>
                         <th class="pb-1 font-medium">Technician</th>
                         <th class="pb-1 text-right font-medium">Assigned</th>
@@ -287,7 +285,7 @@ new #[Layout('components.layouts.app')] #[Title('Reports')] class extends Compon
                         <th class="pb-1 text-right font-medium">Avg resolution</th>
                     </tr>
                 </thead>
-                <tbody class="divide-y divide-zinc-200 dark:divide-zinc-700">
+                <tbody class="divide-y divide-border">
                     @forelse ($report['workload'] as $row)
                         <tr>
                             <td class="py-1.5">{{ $row['technician'] }}</td>
@@ -297,7 +295,7 @@ new #[Layout('components.layouts.app')] #[Title('Reports')] class extends Compon
                             <td class="py-1.5 text-right tabular-nums">{{ $row['avg_resolution_human'] }}</td>
                         </tr>
                     @empty
-                        <tr><td colspan="5" class="py-2 text-zinc-500 dark:text-zinc-400">No data.</td></tr>
+                        <tr><td colspan="5" class="py-2 text-fg-muted">No data.</td></tr>
                     @endforelse
                 </tbody>
             </table>
@@ -307,13 +305,13 @@ new #[Layout('components.layouts.app')] #[Title('Reports')] class extends Compon
     {{-- Volume trends --}}
     <div class="grid gap-4 lg:grid-cols-2">
         @foreach (['daily' => 'Daily volume', 'monthly' => 'Monthly volume'] as $key => $heading)
-            <div class="rounded-xl border border-zinc-200 bg-white p-4 dark:border-zinc-700 dark:bg-zinc-900">
+            <div class="card p-4">
                 <h2 class="mb-3 text-sm font-semibold">{{ $heading }}</h2>
                 <table class="w-full text-sm">
-                    <thead class="text-left text-xs text-zinc-500 dark:text-zinc-400">
+                    <thead class="text-left text-xs text-fg-muted">
                         <tr><th class="pb-1 font-medium">Period</th><th class="pb-1 text-right font-medium">Created</th><th class="pb-1 text-right font-medium">Resolved</th><th class="pb-1 text-right font-medium">Closed</th></tr>
                     </thead>
-                    <tbody class="divide-y divide-zinc-200 dark:divide-zinc-700">
+                    <tbody class="divide-y divide-border">
                         @forelse ($report[$key] as $row)
                             <tr>
                                 <td class="py-1.5 whitespace-nowrap">{{ $row['period'] }}</td>
@@ -322,7 +320,7 @@ new #[Layout('components.layouts.app')] #[Title('Reports')] class extends Compon
                                 <td class="py-1.5 text-right tabular-nums">{{ $row['closed'] }}</td>
                             </tr>
                         @empty
-                            <tr><td colspan="4" class="py-2 text-zinc-500 dark:text-zinc-400">No data.</td></tr>
+                            <tr><td colspan="4" class="py-2 text-fg-muted">No data.</td></tr>
                         @endforelse
                     </tbody>
                 </table>

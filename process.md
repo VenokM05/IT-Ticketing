@@ -54,6 +54,19 @@ Both paths funnel through `TicketService::createTicket`, so company attribution 
   in `config/alerts.php`), groups the count **by company**, and notifies admins. Silent when the queue is clear;
   idempotent once per day (date-keyed notification ref).
 
+## UI / theme
+
+- The whole app runs on a semantic design-token layer (`resources/css/app.css`): slate neutrals + indigo accent,
+  `card` surface, `x-page.header` masthead, `tap` 44px targets — pages use tokens (`bg-canvas`, `text-fg-muted`,
+  `border-border`, `text-accent-content`), never raw color scales.
+- **Light mode is the served default**: no layout hard-codes `class="dark"`; `partials/head.blade.php` seeds
+  `localStorage['flux.appearance'] = 'light'` once (guarded by a `flux.appearance.seeded` marker so an explicit
+  later "System" choice survives), then `@fluxAppearance` applies it.
+- Header **sun/moon toggle** (`components/theme-toggle.blade.php`) flips Light-Dark on the same Flux store the
+  Settings › Appearance page binds (`$flux.appearance`), so the two controls can never drift.
+- Regression guard: `tests/Feature/Theme/ThemeAndLayoutTest.php` asserts light-default HTML, seed +
+  `applyAppearance` presence, toggle rendering, 200s on every primary route, and the compiled token CSS.
+
 ## Running the scheduler (Windows / XAMPP)
 
 - Dev: `php artisan schedule:work` (runs the scheduler loop alongside the app).
