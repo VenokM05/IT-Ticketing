@@ -6,6 +6,7 @@ use App\Enums\TicketStatus;
 use App\Enums\UserRole;
 use App\Exceptions\InvalidStatusTransition;
 use App\Models\Company;
+use App\Models\SavedFilter;
 use App\Models\Ticket;
 use App\Models\User;
 use App\Services\TicketService;
@@ -35,6 +36,11 @@ new #[Layout('components.layouts.app')] #[Title('Tickets')] class extends Compon
 
     public string $bulkAssignee = '';
 
+    public string $saveViewName = '';
+
+    /** The list filter props a saved view can capture/restore. */
+    private const VIEW_KEYS = ['search', 'status', 'priority', 'category', 'technician', 'companyId', 'from', 'to'];
+
     public function updated($property): void
     {
         $this->resetPage();
@@ -60,13 +66,17 @@ new #[Layout('components.layouts.app')] #[Title('Tickets')] class extends Compon
             ->when($this->search, function (Builder $q) use ($isAdmin) {
                 $q->where(function (Builder $inner) use ($isAdmin) {
                     $inner->where('ticket_number', 'like', "%{$this->search}%")
-                        ->orWhere('subject', 'like', "%{$this->search}%");
+                        ->orWhere('subject', 'like', "%{$this->search}%")
+                        ->orWhere('description', 'like', "%{$this->search}%");
 
                     // Requester search is admin-only (§10.2 "where authorized"). Covers both
-                    // enrolled employees and self-declared public requesters.
+                    // enrolled employees and the self-declared public-requester snapshot.
                     if ($isAdmin) {
                         $inner->orWhereHas('employee', fn (Builder $e) => $e->where('name', 'like', "%{$this->search}%"))
-                            ->orWhere('requester_name', 'like', "%{$this->search}%");
+                            ->orWhere('requester_name', 'like', "%{$this->search}%")
+                            ->orWhere('requester_company', 'like', "%{$this->search}%")
+                            ->orWhere('requester_department', 'like', "%{$this->search}%")
+                            ->orWhere('requester_contact', 'like', "%{$this->search}%");
                     }
                 });
             })
@@ -87,10 +97,51 @@ new #[Layout('components.layouts.app')] #[Title('Tickets')] class extends Compon
         return [
             'tickets' => $tickets,
             'companies' => Company::query()->orderBy('name')->get(),
+            'savedViews' => SavedFilter::query()->where('user_id', $user->id)->orderBy('name')->get(),
             'technicians' => $isAdmin
                 ? User::query()->where('role', UserRole::Technician->value)->orderBy('name')->get()
                 : collect(),
         ];
+    }
+
+    /**
+     * Persist the current filters under a name (per user). Re-saving the same
+     * name overwrites the earlier snapshot so a view stays a live bookmark.
+     */
+    public function saveView(): void
+    {
+        $this->validate(['saveViewName' => ['required', 'string', 'max:120']]);
+
+        $payload = array_filter(
+            array_intersect_key(get_object_vars($this), array_flip(self::VIEW_KEYS)),
+            fn ($value) => $value !== '',
+        );
+
+        SavedFilter::query()->updateOrCreate(
+            ['user_id' => auth()->id(), 'name' => trim($this->saveViewName)],
+            ['payload' => $payload],
+        );
+
+        $this->reset('saveViewName');
+        session()->flash('success', 'View saved.');
+    }
+
+    public function applyView(int $id): void
+    {
+        $view = SavedFilter::query()->where('user_id', auth()->id())->find($id);
+
+        if (! $view) {
+            return;
+        }
+
+        $this->reset(self::VIEW_KEYS);
+        $this->fill(array_intersect_key($view->payload ?? [], array_flip(self::VIEW_KEYS)));
+        $this->resetPage();
+    }
+
+    public function deleteView(int $id): void
+    {
+        SavedFilter::query()->where('user_id', auth()->id())->whereKey($id)->delete();
     }
 
     public function toggleAll(): void
@@ -167,7 +218,7 @@ new #[Layout('components.layouts.app')] #[Title('Tickets')] class extends Compon
     {{-- Search + filters (§10.2) --}}
     <div class="grid grid-cols-2 gap-3 card p-4 sm:grid-cols-3 lg:grid-cols-7">
         <div class="col-span-2 sm:col-span-1 lg:col-span-2">
-            <flux:input wire:model.live.debounce.400ms="search" placeholder="Search number / subject…" icon="magnifying-glass" />
+            <flux:input wire:model.live.debounce.400ms="search" placeholder="Search number / subject / description…" icon="magnifying-glass" />
         </div>
         <flux:select wire:model.live="status" placeholder="All statuses">
             <flux:select.option value="">All statuses</flux:select.option>
@@ -204,6 +255,22 @@ new #[Layout('components.layouts.app')] #[Title('Tickets')] class extends Compon
         <flux:input type="date" wire:model.live="from" label="From" />
         <flux:input type="date" wire:model.live="to" label="To" />
         <flux:button wire:click="clear" variant="subtle">Clear</flux:button>
+    </div>
+
+    {{-- Saved views (§10.2): re-apply a familiar queue in one click --}}
+    <div class="flex flex-wrap items-center gap-2 text-sm">
+        @if ($savedViews->isNotEmpty())
+            <span class="text-fg-muted">Saved views:</span>
+            @foreach ($savedViews as $view)
+                <span class="inline-flex items-center gap-1 rounded-full border border-border bg-surface px-2 py-0.5">
+                    <button type="button" wire:click="applyView({{ $view->id }})" class="text-accent-content hover:underline">{{ $view->name }}</button>
+                    <button type="button" wire:click="deleteView({{ $view->id }})" wire:confirm="Delete this view?" class="text-fg-subtle hover:text-red-600" aria-label="Delete {{ $view->name }}">&times;</button>
+                </span>
+            @endforeach
+        @endif
+        <flux:spacer />
+        <flux:input wire:model="saveViewName" placeholder="Name this view" size="sm" class="w-44" />
+        <flux:button size="sm" variant="subtle" wire:click="saveView">Save view</flux:button>
     </div>
 
     <div class="card overflow-hidden">
