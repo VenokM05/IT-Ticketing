@@ -43,7 +43,7 @@ it('renders every primary route over http for an admin', function (string $path)
 })->with([
     '/dashboard', '/tickets', '/tickets/create', '/notifications',
     '/employees', '/companies', '/staff', '/relinks', '/reports',
-    '/settings/profile', '/settings/appearance', '/settings/whatsapp',
+    '/settings/profile', '/settings/appearance', '/settings/whatsapp', '/settings/canned-responses',
 ]);
 
 it('ships the design-token layer in the compiled css', function () {

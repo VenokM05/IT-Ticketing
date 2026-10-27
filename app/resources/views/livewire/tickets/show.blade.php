@@ -9,6 +9,7 @@ use App\Enums\TicketStatus;
 use App\Enums\UserRole;
 use App\Exceptions\InvalidStatusTransition;
 use App\Models\DashboardNotification;
+use App\Models\CannedResponse;
 use App\Models\Ticket;
 use App\Models\TicketMessage;
 use App\Models\User;
@@ -44,6 +45,11 @@ new #[Layout('components.layouts.app')] #[Title('Ticket')] class extends Compone
     public string $noteBody = '';
 
     public bool $noteInternal = true;
+
+    // Selected canned-response id for each composer's "Insert macro" picker.
+    public string $progressMacroId = '';
+
+    public string $noteMacroId = '';
 
     public function mount(Ticket $ticket): void
     {
@@ -211,6 +217,45 @@ new #[Layout('components.layouts.app')] #[Title('Ticket')] class extends Compone
         ]);
     }
 
+    /**
+     * Append a canned response (placeholders rendered against this ticket) to the
+     * progress "Note" field. Reuses the existing addProgress save path.
+     */
+    public function insertProgressMacro(): void
+    {
+        $rendered = $this->renderMacro($this->progressMacroId);
+
+        if ($rendered === null) {
+            return;
+        }
+
+        $this->progressNote = trim($this->progressNote) === '' ? $rendered : $this->progressNote."\n".$rendered;
+        $this->reset('progressMacroId');
+    }
+
+    public function insertNoteMacro(): void
+    {
+        $rendered = $this->renderMacro($this->noteMacroId);
+
+        if ($rendered === null) {
+            return;
+        }
+
+        $this->noteBody = trim($this->noteBody) === '' ? $rendered : $this->noteBody."\n".$rendered;
+        $this->reset('noteMacroId');
+    }
+
+    private function renderMacro(string $macroId): ?string
+    {
+        if ($macroId === '') {
+            return null;
+        }
+
+        $macro = CannedResponse::find((int) $macroId);
+
+        return $macro?->render($this->ticket);
+    }
+
     public function with(): array
     {
         // Notification/delivery records related to this ticket (§10.3).
@@ -218,6 +263,7 @@ new #[Layout('components.layouts.app')] #[Title('Ticket')] class extends Compone
 
         return [
             'allowedTransitions' => $this->ticket->status->allowedTransitions(),
+            'macros' => CannedResponse::query()->orderBy('title')->get(),
             'technicians' => User::query()
                 ->where('role', UserRole::Technician->value)
                 ->where('is_active', true)
@@ -501,6 +547,16 @@ new #[Layout('components.layouts.app')] #[Title('Ticket')] class extends Compone
                         <flux:input wire:model="progressNext" label="Next steps" placeholder="What is next?" />
                         <flux:input wire:model="progressMinutes" label="Time spent (minutes)" type="number" min="0" />
                         <flux:textarea wire:model="progressNote" label="Note" rows="2" placeholder="Free-text note (optional)" />
+                        @if ($macros->isNotEmpty())
+                            <div class="flex items-end gap-2">
+                                <flux:select wire:model="progressMacroId" placeholder="Insert canned response…" class="grow">
+                                    @foreach ($macros as $macro)
+                                        <flux:select.option value="{{ $macro->id }}">{{ $macro->title }}</flux:select.option>
+                                    @endforeach
+                                </flux:select>
+                                <flux:button size="sm" variant="subtle" wire:click="insertProgressMacro">Insert into note</flux:button>
+                            </div>
+                        @endif
                         <flux:checkbox wire:model="progressInternal" label="Internal only (hide from employee)" />
                         @error('progressWork') <p class="text-xs text-red-600">{{ $message }}</p> @enderror
                         <flux:button size="sm" variant="primary" wire:click="addProgress">Record progress</flux:button>
@@ -514,6 +570,16 @@ new #[Layout('components.layouts.app')] #[Title('Ticket')] class extends Compone
                     <h2 class="text-sm font-semibold">Add note</h2>
                     <div class="mt-2 space-y-2">
                         <flux:textarea wire:model="noteBody" rows="2" placeholder="Internal memo or employee-visible message…" />
+                        @if ($macros->isNotEmpty())
+                            <div class="flex items-end gap-2">
+                                <flux:select wire:model="noteMacroId" placeholder="Insert canned response…" class="grow">
+                                    @foreach ($macros as $macro)
+                                        <flux:select.option value="{{ $macro->id }}">{{ $macro->title }}</flux:select.option>
+                                    @endforeach
+                                </flux:select>
+                                <flux:button size="sm" variant="subtle" wire:click="insertNoteMacro">Insert</flux:button>
+                            </div>
+                        @endif
                         <flux:checkbox wire:model="noteInternal" label="Internal only (hide from employee)" />
                         @error('noteBody') <p class="text-xs text-red-600">{{ $message }}</p> @enderror
                         <flux:button size="sm" wire:click="addNote">Add note</flux:button>

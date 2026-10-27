@@ -51,6 +51,9 @@ Route::middleware(['auth'])->group(function () {
     Volt::route('settings/appearance', 'settings.appearance')->name('settings.appearance');
     // WhatsApp API credentials — administrator only (enforced in the page).
     Volt::route('settings/whatsapp', 'settings.whatsapp')->name('settings.whatsapp');
+
+    // Canned responses / macros — administrator only (enforced in the page).
+    Volt::route('settings/canned-responses', 'settings.canned-responses')->name('settings.canned-responses');
 });
 
 require __DIR__.'/auth.php';
