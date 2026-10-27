@@ -28,6 +28,7 @@
                     <flux:navlist.group heading="Administration" class="mt-2 grid">
                         <flux:navlist.item icon="user-group" :href="route('employees')" :current="request()->routeIs('employees*')" wire:navigate>Employees</flux:navlist.item>
                         <flux:navlist.item icon="building-office-2" :href="route('companies')" :current="request()->routeIs('companies*')" wire:navigate>Companies</flux:navlist.item>
+                        <flux:navlist.item icon="wrench-screwdriver" :href="route('staff')" :current="request()->routeIs('staff*')" wire:navigate>Staff</flux:navlist.item>
                         <flux:navlist.item icon="identification" :href="route('relinks')" :current="request()->routeIs('relinks')" wire:navigate>Approvals</flux:navlist.item>
                         <flux:navlist.item icon="chart-bar" :href="route('reports')" :current="request()->routeIs('reports*')" wire:navigate>Reports</flux:navlist.item>
                     </flux:navlist.group>

@@ -1,5 +1,6 @@
 <?php
 
+use App\Enums\TicketCategory;
 use App\Enums\TicketStatus;
 use App\Models\Company;
 use App\Models\Employee;
@@ -95,4 +96,71 @@ it('does not auto-assign when the feature is disabled', function () {
 
     expect($ticket->assigned_to)->toBeNull()
         ->and($ticket->status)->toBe(TicketStatus::New);
+});
+
+it('prefers a category-skilled technician over a less-loaded generalist', function () {
+    $company = Company::factory()->create();
+    $generalist = User::factory()->technician()->create(['company_id' => $company->id]);
+    $specialist = User::factory()->technician()->create(['company_id' => $company->id]);
+    $specialist->skills()->create(['category_key' => TicketCategory::Printer->value]);
+
+    // Load the specialist heavier so only the skill preference can override it.
+    Ticket::factory()->count(3)->create([
+        'company_id' => $company->id, 'assigned_to' => $specialist->id, 'status' => TicketStatus::InProgress,
+    ]);
+
+    $ticket = app(TicketService::class)->createTicket([
+        'company_id' => $company->id,
+        'subject' => 'Toner refill',
+        'description' => 'Floor 3 printer out of toner.',
+        'category' => TicketCategory::Printer,
+    ]);
+
+    expect($ticket->assigned_to)->toBe($specialist->id)
+        ->and($ticket->assigned_to)->not->toBe($generalist->id);
+});
+
+it('prefers the on-call skilled technician when several are skilled', function () {
+    $company = Company::factory()->create();
+    $available = User::factory()->technician()->create(['company_id' => $company->id]);
+    $available->skills()->create(['category_key' => TicketCategory::Network->value]);
+
+    $onCall = User::factory()->technician()->create(['company_id' => $company->id, 'is_on_call' => true]);
+    $onCall->skills()->create(['category_key' => TicketCategory::Network->value]);
+
+    // Give the non-on-call tech fewer open tickets; on-call should still win.
+    Ticket::factory()->count(2)->create([
+        'company_id' => $company->id, 'assigned_to' => $onCall->id, 'status' => TicketStatus::InProgress,
+    ]);
+
+    $ticket = app(TicketService::class)->createTicket([
+        'company_id' => $company->id,
+        'subject' => 'Switch port dead',
+        'description' => 'No link on office switch.',
+        'category' => TicketCategory::Network,
+    ]);
+
+    expect($ticket->assigned_to)->toBe($onCall->id);
+});
+
+it('falls back to least-loaded overall when nobody has the skill', function () {
+    $company = Company::factory()->create();
+    $busy = User::factory()->technician()->create(['company_id' => $company->id]);
+    $busy->skills()->create(['category_key' => TicketCategory::Hardware->value]);
+    $free = User::factory()->technician()->create(['company_id' => $company->id]);
+
+    Ticket::factory()->count(2)->create([
+        'company_id' => $company->id, 'assigned_to' => $free->id, 'status' => TicketStatus::InProgress,
+    ]);
+
+    // Category has no matching skill anywhere -> general load balancing (busier tech has a skill but it is irrelevant here; fewest open wins).
+    $ticket = app(TicketService::class)->createTicket([
+        'company_id' => $company->id,
+        'subject' => 'Badge reader',
+        'description' => 'Door badge reader offline.',
+        'category' => TicketCategory::Access,
+    ]);
+
+    // busy has 0 open, free has 2 -> busy is least loaded.
+    expect($ticket->assigned_to)->toBe($busy->id);
 });

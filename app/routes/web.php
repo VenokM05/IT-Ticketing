@@ -35,6 +35,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // Companies — multi-tenant tagging, administrator only.
     Volt::route('companies', 'companies.index')->name('companies');
 
+    // Staff / technician routing (home company, skills, on-call) — administrator only.
+    Volt::route('staff', 'staff.index')->name('staff');
+
     // Operational reporting — administrator only (Phase 6); gated in the page/controller.
     Volt::route('reports', 'reports.index')->name('reports');
     Route::get('reports/export', ReportExportController::class)->name('reports.export');

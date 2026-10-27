@@ -29,6 +29,7 @@ class User extends Authenticatable // implements MustVerifyEmail
         'role',
         'company_id',
         'is_active',
+        'is_on_call',
     ];
 
     /**
@@ -53,6 +54,7 @@ class User extends Authenticatable // implements MustVerifyEmail
             'password' => 'hashed',
             'role' => UserRole::class,
             'is_active' => 'boolean',
+            'is_on_call' => 'boolean',
         ];
     }
 
@@ -70,6 +72,14 @@ class User extends Authenticatable // implements MustVerifyEmail
     public function company(): BelongsTo
     {
         return $this->belongsTo(Company::class);
+    }
+
+    /**
+     * Request categories this technician is skilled in (skill-aware auto-assign).
+     */
+    public function skills(): HasMany
+    {
+        return $this->hasMany(TechnicianSkill::class);
     }
 
     public function isAdmin(): bool

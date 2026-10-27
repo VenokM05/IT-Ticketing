@@ -15,6 +15,7 @@ use App\Models\TicketProgressReport;
 use App\Models\TicketProgressUpdate;
 use App\Models\TicketStatusHistory;
 use App\Models\User;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -53,7 +54,11 @@ class TicketService
             $autoAssignee = null;
 
             if ($assigneeId === null && $companyId !== null && config('tickets.auto_assign')) {
-                $autoAssignee = $this->resolveAutoAssignee((int) $companyId);
+                $categoryKey = isset($attributes['category'])
+                    ? ($attributes['category'] instanceof \BackedEnum ? $attributes['category']->value : $attributes['category'])
+                    : null;
+
+                $autoAssignee = $this->resolveAutoAssignee((int) $companyId, $categoryKey);
 
                 if ($autoAssignee !== null) {
                     $assigneeId = $autoAssignee->id;
@@ -138,13 +143,16 @@ class TicketService
     }
 
     /**
-     * Choose the company's technician carrying the fewest open tickets. Returns null
-     * when the company has no active technician, so the ticket falls back to the
-     * manual New queue rather than being mis-assigned.
+     * Choose who a ticket auto-routes to within the company. When a category is
+     * known it prefers an on-call technician skilled in that category, then any
+     * skilled technician, then — as a last resort — the least-loaded technician
+     * overall so nothing stalls in the unassigned queue. Returns null only when
+     * the company has no active technician.
      */
-    private function resolveAutoAssignee(int $companyId): ?User
+    private function resolveAutoAssignee(int $companyId, ?string $category = null): ?User
     {
         $technicians = User::query()
+            ->with('skills')
             ->where('role', UserRole::Technician->value)
             ->where('is_active', true)
             ->where('company_id', $companyId)
@@ -162,9 +170,25 @@ class TicketService
             ->groupBy('assigned_to')
             ->pluck('aggregate', 'assigned_to');
 
-        return $technicians
-            ->sortBy(fn (User $tech) => (int) $open->get($tech->id, 0))
+        $leastLoaded = fn (Collection $group) => $group
+            ->sortBy(fn (User $t) => (int) $open->get($t->id, 0))
             ->first();
+
+        if ($category !== null) {
+            $skilled = $technicians->filter(fn (User $t) => $t->skills->contains('category_key', $category));
+
+            $onCallSkilled = $skilled->filter(fn (User $t) => (bool) $t->is_on_call);
+
+            if ($onCallSkilled->isNotEmpty()) {
+                return $leastLoaded($onCallSkilled);
+            }
+
+            if ($skilled->isNotEmpty()) {
+                return $leastLoaded($skilled);
+            }
+        }
+
+        return $leastLoaded($technicians);
     }
 
     /**
