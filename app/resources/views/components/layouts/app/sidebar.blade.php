@@ -83,6 +83,8 @@
                     @if (auth()->user()->isAdmin())
                         <flux:menu.item href="{{ route('settings.whatsapp') }}" icon="chat-bubble-left-right" wire:navigate>WhatsApp</flux:menu.item>
                         <flux:menu.item href="{{ route('settings.canned-responses') }}" icon="clipboard-document-list" wire:navigate>Canned Responses</flux:menu.item>
+                        <flux:menu.item href="{{ route('settings.categories') }}" icon="tag" wire:navigate>Categories</flux:menu.item>
+                        <flux:menu.item href="{{ route('settings.priorities') }}" icon="signal" wire:navigate>Priorities</flux:menu.item>
                     @endif
 
                     <flux:menu.separator />

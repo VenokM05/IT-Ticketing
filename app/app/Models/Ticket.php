@@ -3,8 +3,6 @@
 namespace App\Models;
 
 use App\Enums\ReportType;
-use App\Enums\TicketCategory;
-use App\Enums\TicketPriority;
 use App\Enums\TicketStatus;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
@@ -24,8 +22,8 @@ class Ticket extends Model
         'assigned_to',
         'subject',
         'description',
-        'category',
-        'priority',
+        'category_id',
+        'priority_id',
         'status',
         'first_response_at',
         'started_at',
@@ -51,8 +49,6 @@ class Ticket extends Model
     {
         return [
             'status' => TicketStatus::class,
-            'priority' => TicketPriority::class,
-            'category' => TicketCategory::class,
             'first_response_at' => 'datetime',
             'started_at' => 'datetime',
             'resolved_at' => 'datetime',
@@ -80,6 +76,21 @@ class Ticket extends Model
     public function assignee(): BelongsTo
     {
         return $this->belongsTo(User::class, 'assigned_to');
+    }
+
+    /**
+     * DB-managed classification (PRD Phase 9). The category/priority relations
+     * replace the old enum casts; a `value` accessor + `label()` method on each
+     * lookup model keeps `$ticket->category->value` / `->label()` call sites intact.
+     */
+    public function category(): BelongsTo
+    {
+        return $this->belongsTo(Category::class);
+    }
+
+    public function priority(): BelongsTo
+    {
+        return $this->belongsTo(Priority::class);
     }
 
     public function messages(): HasMany

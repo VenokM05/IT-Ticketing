@@ -1,11 +1,11 @@
 <?php
 
-use App\Enums\TicketCategory;
-use App\Enums\TicketPriority;
 use App\Enums\TicketStatus;
 use App\Enums\UserRole;
+use App\Models\Category;
 use App\Models\Company;
 use App\Models\Department;
+use App\Models\Priority;
 use App\Models\User;
 use App\Services\ReportService;
 use Livewire\Attributes\Layout;
@@ -77,6 +77,8 @@ new #[Layout('components.layouts.app')] #[Title('Reports')] class extends Compon
         return [
             'report' => $report,
             'exportQuery' => array_filter($this->filters(), fn (string $v) => $v !== ''),
+            'categories' => Category::query()->active()->ordered()->get(),
+            'priorities' => Priority::query()->active()->ordered()->get(),
             'technicians' => User::query()->where('role', UserRole::Technician->value)->orderBy('name')->get(),
             'departments' => Department::query()->orderBy('name')->get(),
             'companies' => Company::query()->orderBy('name')->get(),
@@ -108,13 +110,13 @@ new #[Layout('components.layouts.app')] #[Title('Reports')] class extends Compon
         </flux:select>
         <flux:select wire:model.live="priority" placeholder="All priorities">
             <flux:select.option value="">All priorities</flux:select.option>
-            @foreach (TicketPriority::cases() as $case)
+            @foreach ($priorities as $case)
                 <flux:select.option value="{{ $case->value }}">{{ $case->label() }}</flux:select.option>
             @endforeach
         </flux:select>
         <flux:select wire:model.live="category" placeholder="All categories">
             <flux:select.option value="">All categories</flux:select.option>
-            @foreach (TicketCategory::cases() as $case)
+            @foreach ($categories as $case)
                 <flux:select.option value="{{ $case->value }}">{{ $case->label() }}</flux:select.option>
             @endforeach
         </flux:select>

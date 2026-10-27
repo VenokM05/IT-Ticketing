@@ -15,6 +15,9 @@ class DatabaseSeeder extends Seeder
         // Single IT Administrator login for the dashboard admin pages.
         $this->call(AdminUserSeeder::class);
 
+        // DB-managed classification lookups (categories + priorities, Phase 9).
+        $this->call(LookupSeeder::class);
+
         // Live client companies + one IT technician account each (auto-assign target).
         $this->call(CompanyProvisionerSeeder::class);
 

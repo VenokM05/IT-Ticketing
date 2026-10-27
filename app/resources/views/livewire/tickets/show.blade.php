@@ -3,13 +3,13 @@
 use App\Enums\MessageChannel;
 use App\Enums\MessageDirection;
 use App\Enums\MessageType;
-use App\Enums\TicketCategory;
-use App\Enums\TicketPriority;
 use App\Enums\TicketStatus;
 use App\Enums\UserRole;
 use App\Exceptions\InvalidStatusTransition;
 use App\Models\DashboardNotification;
 use App\Models\CannedResponse;
+use App\Models\Category;
+use App\Models\Priority;
 use App\Models\Ticket;
 use App\Models\TicketMessage;
 use App\Models\User;
@@ -144,8 +144,8 @@ new #[Layout('components.layouts.app')] #[Title('Ticket')] class extends Compone
 
         app(TicketService::class)->updateClassification(
             $this->ticket,
-            TicketPriority::from($validated['classPriority']),
-            TicketCategory::from($validated['classCategory']),
+            Priority::resolve($validated['classPriority']),
+            Category::resolve($validated['classCategory']),
             auth()->user(),
         );
 
@@ -289,6 +289,8 @@ new #[Layout('components.layouts.app')] #[Title('Ticket')] class extends Compone
             'canUpdate' => auth()->user()->can('update', $this->ticket),
             'canAssign' => auth()->user()->can('assign', $this->ticket),
             'canProgress' => auth()->user()->can('addProgress', $this->ticket),
+            'categories' => Category::query()->active()->ordered()->get(),
+            'priorities' => Priority::query()->active()->ordered()->get(),
         ];
     }
 }; ?>
@@ -547,12 +549,12 @@ new #[Layout('components.layouts.app')] #[Title('Ticket')] class extends Compone
                     <h2 class="text-sm font-semibold">Category & priority</h2>
                     <div class="mt-2 space-y-2">
                         <flux:select wire:model="classCategory" placeholder="Category">
-                            @foreach (TicketCategory::cases() as $case)
+                            @foreach ($categories as $case)
                                 <flux:select.option value="{{ $case->value }}">{{ $case->label() }}</flux:select.option>
                             @endforeach
                         </flux:select>
                         <flux:select wire:model="classPriority" placeholder="Priority">
-                            @foreach (TicketPriority::cases() as $case)
+                            @foreach ($priorities as $case)
                                 <flux:select.option value="{{ $case->value }}">{{ $case->label() }}</flux:select.option>
                             @endforeach
                         </flux:select>

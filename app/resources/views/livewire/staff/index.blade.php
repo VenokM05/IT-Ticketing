@@ -1,8 +1,8 @@
 <?php
 
-use App\Enums\TicketCategory;
 use App\Enums\TicketStatus;
 use App\Enums\UserRole;
+use App\Models\Category;
 use App\Models\Company;
 use App\Models\Ticket;
 use App\Models\User;
@@ -87,7 +87,7 @@ new #[Layout('components.layouts.app')] #[Title('Staff')] class extends Componen
             'fEmail' => ['required', 'email', 'max:255', Rule::unique('users', 'email')->ignore($this->editingId)],
             'fCompanyId' => ['required', 'integer', 'exists:companies,id'],
             'fSkills' => ['array'],
-            'fSkills.*' => [Rule::in(array_column(TicketCategory::cases(), 'value'))],
+            'fSkills.*' => [Rule::in(Category::query()->pluck('key')->all())],
         ];
 
         if ($this->editingId) {
@@ -153,7 +153,7 @@ new #[Layout('components.layouts.app')] #[Title('Staff')] class extends Componen
             'technicians' => $technicians,
             'open' => $open,
             'companies' => Company::query()->where('is_active', true)->orderBy('name')->get(),
-            'categories' => TicketCategory::cases(),
+            'categories' => Category::query()->ordered()->get(),
         ];
     }
 }; ?>
@@ -229,7 +229,7 @@ new #[Layout('components.layouts.app')] #[Title('Staff')] class extends Componen
                             <td class="px-4 py-2">{{ $tech->company?->name ?? '—' }}</td>
                             <td class="px-4 py-2">
                                 @forelse ($tech->skills as $skill)
-                                    <flux:badge size="sm" color="zinc" class="mb-1">{{ \App\Enums\TicketCategory::from($skill->category_key)->label() }}</flux:badge>
+                                    <flux:badge size="sm" color="zinc" class="mb-1">{{ \App\Models\Category::firstWhere('key', $skill->category_key)?->label() }}</flux:badge>
                                 @empty
                                     <span class="text-fg-subtle">Generalist</span>
                                 @endforelse

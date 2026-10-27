@@ -2,6 +2,8 @@
 
 use App\Enums\TicketCategory;
 use App\Enums\TicketPriority;
+use App\Models\Category;
+use App\Models\Priority;
 use App\Models\Ticket;
 use App\Services\TicketService;
 use Illuminate\Support\Carbon;
@@ -76,16 +78,17 @@ it('recomputes deadlines when the priority is changed', function () {
     $ticket = slaCreate(TicketPriority::Low); // response due 2026-11-02 09:00
     expect($ticket->response_due_at->toDateTimeString())->toBe('2026-11-02 09:00:00');
 
-    $service->updateClassification($ticket, TicketPriority::Critical, TicketCategory::Hardware);
+    $service->updateClassification($ticket, Priority::resolve('critical'), Category::resolve('hardware'));
 
     // Re-derived from the same created_at with the critical window.
     expect($ticket->response_due_at->toDateTimeString())->toBe('2026-11-01 10:00:00')
-        ->and($ticket->fresh()->priority)->toBe(TicketPriority::Critical);
+        ->and($ticket->fresh()->priority->key)->toBe('critical');
 });
 
 it('leaves deadlines null for a priority with no configured window', function () {
     Carbon::setTestNow('2026-11-01 09:00:00');
-    config(['tickets.sla' => []]);
+    // SLA budgets are DB-managed now (Phase 9): blank the medium priority's hours.
+    Priority::query()->where('key', 'medium')->update(['sla_response_hours' => null, 'sla_resolve_hours' => null]);
 
     $ticket = slaCreate(TicketPriority::Medium);
 

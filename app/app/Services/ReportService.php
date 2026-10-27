@@ -2,8 +2,8 @@
 
 namespace App\Services;
 
-use App\Enums\TicketPriority;
 use App\Enums\TicketStatus;
+use App\Models\Priority;
 use App\Models\Ticket;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Carbon;
@@ -24,12 +24,12 @@ class ReportService
     public function query(array $filters = []): Builder
     {
         return Ticket::query()
-            ->with(['employee.department', 'company', 'assignee'])
+            ->with(['employee.department', 'company', 'assignee', 'priority', 'category'])
             ->when($filters['from'] ?? null, fn (Builder $q, string $v) => $q->whereDate('created_at', '>=', $v))
             ->when($filters['to'] ?? null, fn (Builder $q, string $v) => $q->whereDate('created_at', '<=', $v))
             ->when($filters['status'] ?? null, fn (Builder $q, string $v) => $q->where('status', $v))
-            ->when($filters['priority'] ?? null, fn (Builder $q, string $v) => $q->where('priority', $v))
-            ->when($filters['category'] ?? null, fn (Builder $q, string $v) => $q->where('category', $v))
+            ->when($filters['priority'] ?? null, fn (Builder $q, string $v) => $q->whereHas('priority', fn (Builder $p) => $p->where('key', $v)))
+            ->when($filters['category'] ?? null, fn (Builder $q, string $v) => $q->whereHas('category', fn (Builder $c) => $c->where('key', $v)))
             ->when($filters['technician'] ?? null, fn (Builder $q, string $v) => $q->where('assigned_to', $v))
             ->when($filters['department'] ?? null, fn (Builder $q, string $v) => $q->whereHas('employee', fn (Builder $e) => $e->where('department_id', $v)))
             ->when($filters['company'] ?? null, fn (Builder $q, string $v) => $q->where('company_id', $v));
@@ -132,14 +132,14 @@ class ReportService
 
     /**
      * @param  Collection<int, Ticket>  $tickets
-     * @return array<int, array{priority: TicketPriority, count: int}>
+     * @return array<int, array{priority: Priority, count: int}>
      */
     public function byPriority(Collection $tickets): array
     {
-        $counts = $tickets->countBy(fn (Ticket $t) => $t->priority->value);
+        $counts = $tickets->countBy(fn (Ticket $t) => $t->priority?->key);
 
-        return collect(TicketPriority::cases())
-            ->map(fn (TicketPriority $p) => ['priority' => $p, 'count' => (int) ($counts[$p->value] ?? 0)])
+        return Priority::query()->ordered()->get()
+            ->map(fn (Priority $p) => ['priority' => $p, 'count' => (int) ($counts[$p->key] ?? 0)])
             ->all();
     }
 

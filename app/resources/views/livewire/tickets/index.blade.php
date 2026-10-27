@@ -1,11 +1,11 @@
 <?php
 
-use App\Enums\TicketCategory;
-use App\Enums\TicketPriority;
 use App\Enums\TicketStatus;
 use App\Enums\UserRole;
 use App\Exceptions\InvalidStatusTransition;
+use App\Models\Category;
 use App\Models\Company;
+use App\Models\Priority;
 use App\Models\SavedFilter;
 use App\Models\Ticket;
 use App\Models\User;
@@ -61,7 +61,7 @@ new #[Layout('components.layouts.app')] #[Title('Tickets')] class extends Compon
         $isAdmin = $user->isAdmin();
 
         $tickets = Ticket::query()
-            ->with(['assignee', 'employee', 'company'])
+            ->with(['assignee', 'employee', 'company', 'category', 'priority'])
             ->when(! $isAdmin, fn (Builder $q) => $q->where('assigned_to', $user->id))
             ->when($this->search, function (Builder $q) use ($isAdmin) {
                 $q->where(function (Builder $inner) use ($isAdmin) {
@@ -81,8 +81,8 @@ new #[Layout('components.layouts.app')] #[Title('Tickets')] class extends Compon
                 });
             })
             ->when($this->status, fn (Builder $q) => $q->where('status', $this->status))
-            ->when($this->priority, fn (Builder $q) => $q->where('priority', $this->priority))
-            ->when($this->category, fn (Builder $q) => $q->where('category', $this->category))
+            ->when($this->priority, fn (Builder $q) => $q->whereHas('priority', fn (Builder $p) => $p->where('key', $this->priority)))
+            ->when($this->category, fn (Builder $q) => $q->whereHas('category', fn (Builder $c) => $c->where('key', $this->category)))
             ->when($this->technician, fn (Builder $q) => $q->where('assigned_to', $this->technician))
             ->when($this->companyId, fn (Builder $q) => $q->where('company_id', $this->companyId))
             ->when($this->from, fn (Builder $q) => $q->whereDate('created_at', '>=', $this->from))
@@ -97,6 +97,8 @@ new #[Layout('components.layouts.app')] #[Title('Tickets')] class extends Compon
         return [
             'tickets' => $tickets,
             'companies' => Company::query()->orderBy('name')->get(),
+            'categories' => Category::query()->active()->ordered()->get(),
+            'priorities' => Priority::query()->active()->ordered()->get(),
             'savedViews' => SavedFilter::query()->where('user_id', $user->id)->orderBy('name')->get(),
             'technicians' => $isAdmin
                 ? User::query()->where('role', UserRole::Technician->value)->orderBy('name')->get()
@@ -228,13 +230,13 @@ new #[Layout('components.layouts.app')] #[Title('Tickets')] class extends Compon
         </flux:select>
         <flux:select wire:model.live="priority" placeholder="All priorities">
             <flux:select.option value="">All priorities</flux:select.option>
-            @foreach (TicketPriority::cases() as $case)
+            @foreach ($priorities as $case)
                 <flux:select.option value="{{ $case->value }}">{{ $case->label() }}</flux:select.option>
             @endforeach
         </flux:select>
         <flux:select wire:model.live="category" placeholder="All categories">
             <flux:select.option value="">All categories</flux:select.option>
-            @foreach (TicketCategory::cases() as $case)
+            @foreach ($categories as $case)
                 <flux:select.option value="{{ $case->value }}">{{ $case->label() }}</flux:select.option>
             @endforeach
         </flux:select>
@@ -329,7 +331,7 @@ new #[Layout('components.layouts.app')] #[Title('Tickets')] class extends Compon
                             <td class="px-4 py-2">{{ $ticket->requesterName() ?? '—' }}</td>
                             <td class="px-4 py-2">{{ $ticket->companyLabel() }}</td>
                             <td class="px-4 py-2">{{ $ticket->category->label() }}</td>
-                            <td class="px-4 py-2"><flux:badge :color="match ($ticket->priority) { \App\Enums\TicketPriority::Critical => 'red', \App\Enums\TicketPriority::High => 'orange', default => 'zinc' }" size="sm">{{ $ticket->priority->label() }}</flux:badge></td>
+                            <td class="px-4 py-2"><flux:badge :color="match ($ticket->priority?->key) { 'critical' => 'red', 'high' => 'orange', default => 'zinc' }" size="sm">{{ $ticket->priority?->label() }}</flux:badge></td>
                             <td class="px-4 py-2"><flux:badge :color="match ($ticket->status) { \App\Enums\TicketStatus::Closed => 'zinc', \App\Enums\TicketStatus::Resolved => 'green', \App\Enums\TicketStatus::InProgress => 'blue', \App\Enums\TicketStatus::Pending => 'amber', default => 'purple' }" size="sm">{{ $ticket->status->label() }}</flux:badge></td>
                             <td class="px-4 py-2">
                                 @php($sla = $ticket->slaSummaryState())

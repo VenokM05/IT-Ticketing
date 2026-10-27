@@ -1,6 +1,6 @@
 <?php
 
-use App\Enums\TicketCategory;
+use App\Models\Category;
 use App\Models\CannedResponse;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
@@ -61,7 +61,7 @@ new #[Layout('components.layouts.app')] #[Title('Canned Responses')] class exten
         $this->validate([
             'fTitle' => ['required', 'string', 'max:255'],
             'fBody' => ['required', 'string', 'max:5000'],
-            'fCategory' => ['nullable', 'string', 'in:'.implode(',', array_column(TicketCategory::cases(), 'value'))],
+            'fCategory' => ['nullable', 'string', 'in:'.implode(',', Category::query()->pluck('key')->all())],
         ]);
 
         $macro = $this->editingId ? CannedResponse::find($this->editingId) : new CannedResponse;
@@ -94,7 +94,7 @@ new #[Layout('components.layouts.app')] #[Title('Canned Responses')] class exten
     {
         return [
             'macros' => CannedResponse::query()->with('author')->orderBy('title')->get(),
-            'categories' => TicketCategory::cases(),
+            'categories' => Category::query()->ordered()->get(),
         ];
     }
 }; ?>
@@ -151,7 +151,7 @@ new #[Layout('components.layouts.app')] #[Title('Canned Responses')] class exten
                             <td class="px-4 py-2 align-top font-medium">{{ $macro->title }}</td>
                             <td class="px-4 py-2 align-top">
                                 @if ($macro->category_key)
-                                    <flux:badge size="sm" color="zinc">{{ \App\Enums\TicketCategory::from($macro->category_key)->label() }}</flux:badge>
+                                    <flux:badge size="sm" color="zinc">{{ \App\Models\Category::firstWhere('key', $macro->category_key)?->label() }}</flux:badge>
                                 @else
                                     <span class="text-fg-subtle">—</span>
                                 @endif

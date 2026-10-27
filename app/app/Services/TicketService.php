@@ -4,12 +4,12 @@ namespace App\Services;
 
 use App\Enums\ReportStatus;
 use App\Enums\ReportType;
-use App\Enums\TicketCategory;
-use App\Enums\TicketPriority;
 use App\Enums\TicketStatus;
 use App\Enums\UserRole;
 use App\Exceptions\InvalidStatusTransition;
+use App\Models\Category;
 use App\Models\Employee;
+use App\Models\Priority;
 use App\Models\Ticket;
 use App\Models\TicketProgressReport;
 use App\Models\TicketProgressUpdate;
@@ -48,6 +48,12 @@ class TicketService
             $status = $attributes['status'] ?? TicketStatus::New;
             $assigneeId = $attributes['assigned_to'] ?? null;
 
+            // Classification is DB-managed now (Phase 9): resolve the incoming
+            // category/priority (enum, key string or model) to lookup rows,
+            // defaulting to general/medium so intake channels never miss one.
+            $category = Category::resolve($attributes['category'] ?? 'general');
+            $priority = Priority::resolve($attributes['priority'] ?? 'medium');
+
             // Auto-assign: when no technician was chosen explicitly, hand the ticket
             // to the company's least-loaded technician so it skips the unassigned
             // New queue (config tickets.auto_assign). Calls that already name an
@@ -55,11 +61,7 @@ class TicketService
             $autoAssignee = null;
 
             if ($assigneeId === null && $companyId !== null && config('tickets.auto_assign')) {
-                $categoryKey = isset($attributes['category'])
-                    ? ($attributes['category'] instanceof \BackedEnum ? $attributes['category']->value : $attributes['category'])
-                    : null;
-
-                $autoAssignee = $this->resolveAutoAssignee((int) $companyId, $categoryKey);
+                $autoAssignee = $this->resolveAutoAssignee((int) $companyId, $category?->key);
 
                 if ($autoAssignee !== null) {
                     $assigneeId = $autoAssignee->id;
@@ -70,9 +72,14 @@ class TicketService
                 }
             }
 
+            $data = $attributes;
+            unset($data['category'], $data['priority']);
+
             $ticket = Ticket::create([
-                ...$attributes,
+                ...$data,
                 'company_id' => $companyId,
+                'category_id' => $category?->id,
+                'priority_id' => $priority?->id,
                 'assigned_to' => $assigneeId,
                 'ticket_number' => $this->numbers->next(),
                 'status' => $status,
@@ -100,21 +107,20 @@ class TicketService
 
     /**
      * Stamp (or refresh) the SLA response/resolve deadlines for a ticket from its
-     * priority and creation instant. Tickets whose priority has no configured
-     * window keep null deadlines. Called on intake and whenever priority changes.
+     * priority's DB-managed hour budgets and creation instant. Priorities with no
+     * configured window keep null deadlines. Called on intake and on priority change.
      */
     public function applySla(Ticket $ticket): Ticket
     {
-        $window = config('tickets.sla')[$ticket->priority?->value] ?? null;
+        $priority = $ticket->priority;
 
         $base = $ticket->created_at ?? now();
 
-        $ticket->response_due_at = $window === null
-            ? null
-            : $base->copy()->addHours($window['response']);
-        $ticket->resolve_due_at = $window === null
-            ? null
-            : $base->copy()->addHours($window['resolve']);
+        $response = $priority?->sla_response_hours;
+        $resolve = $priority?->sla_resolve_hours;
+
+        $ticket->response_due_at = $response === null ? null : $base->copy()->addHours($response);
+        $ticket->resolve_due_at = $resolve === null ? null : $base->copy()->addHours($resolve);
         $ticket->save();
 
         return $ticket;
@@ -126,18 +132,18 @@ class TicketService
      */
     public function updateClassification(
         Ticket $ticket,
-        TicketPriority $priority,
-        TicketCategory $category,
+        Priority $priority,
+        Category $category,
         ?User $actor = null,
     ): Ticket {
-        $priorityChanged = $ticket->priority !== $priority;
-        $categoryChanged = $ticket->category !== $category;
+        $priorityChanged = $ticket->priority_id !== $priority->id;
+        $categoryChanged = $ticket->category_id !== $category->id;
 
-        $before = ['priority' => $ticket->priority?->value, 'category' => $ticket->category?->value];
+        $before = ['priority' => $ticket->priority?->key, 'category' => $ticket->category?->key];
 
         $ticket->update([
-            'priority' => $priority,
-            'category' => $category,
+            'priority_id' => $priority->id,
+            'category_id' => $category->id,
         ]);
 
         if ($priorityChanged) {
@@ -147,7 +153,7 @@ class TicketService
         if ($priorityChanged || $categoryChanged) {
             $this->audit->record('ticket.classification_updated', $ticket, [
                 'before' => $before,
-                'after' => ['priority' => $priority->value, 'category' => $category->value],
+                'after' => ['priority' => $priority->key, 'category' => $category->key],
             ], $actor?->id);
         }
 

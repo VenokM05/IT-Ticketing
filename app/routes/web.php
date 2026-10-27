@@ -60,6 +60,10 @@ Route::middleware(['auth'])->group(function () {
 
     // Canned responses / macros — administrator only (enforced in the page).
     Volt::route('settings/canned-responses', 'settings.canned-responses')->name('settings.canned-responses');
+
+    // DB-managed classification lookups — administrator only (enforced in the page).
+    Volt::route('settings/categories', 'settings.categories')->name('settings.categories');
+    Volt::route('settings/priorities', 'settings.priorities')->name('settings.priorities');
 });
 
 require __DIR__.'/auth.php';

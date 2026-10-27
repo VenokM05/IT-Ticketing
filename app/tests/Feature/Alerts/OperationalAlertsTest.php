@@ -1,12 +1,12 @@
 <?php
 
 use App\Enums\NotificationType;
-use App\Enums\TicketPriority;
 use App\Enums\TicketStatus;
 use App\Models\Company;
 use App\Models\DashboardNotification;
 use App\Models\Department;
 use App\Models\Employee;
+use App\Models\Priority;
 use App\Models\Ticket;
 use App\Models\User;
 use Illuminate\Console\Scheduling\Schedule;
@@ -36,7 +36,7 @@ function alertTicket(Company $company, Department $department, TicketStatus $sta
         'company_id' => $company->id,
         'assigned_to' => $assignee->id,
         'status' => $status,
-        'priority' => TicketPriority::Medium,
+        'priority_id' => Priority::resolve('medium')->id,
     ]);
 }
 

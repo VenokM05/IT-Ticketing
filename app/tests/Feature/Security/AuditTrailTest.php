@@ -1,10 +1,10 @@
 <?php
 
-use App\Enums\TicketCategory;
-use App\Enums\TicketPriority;
 use App\Enums\TicketStatus;
 use App\Models\ActivityLog;
+use App\Models\Category;
 use App\Models\Company;
+use App\Models\Priority;
 use App\Models\Ticket;
 use App\Models\User;
 use App\Services\TicketService;
@@ -16,11 +16,11 @@ use Livewire\Volt\Volt;
 it('audits a manual classification change with before/after and the actor', function () {
     $admin = User::factory()->admin()->create();
     $ticket = Ticket::factory()->create([
-        'priority' => TicketPriority::Low,
-        'category' => TicketCategory::General,
+        'priority_id' => Priority::resolve('low')->id,
+        'category_id' => Category::resolve('general')->id,
     ]);
 
-    app(TicketService::class)->updateClassification($ticket, TicketPriority::High, TicketCategory::General, $admin);
+    app(TicketService::class)->updateClassification($ticket, Priority::resolve('high'), Category::resolve('general'), $admin);
 
     $log = ActivityLog::query()->where('event', 'ticket.classification_updated')->sole();
     expect($log->actor_id)->toBe($admin->id)

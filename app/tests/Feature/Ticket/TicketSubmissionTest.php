@@ -1,6 +1,5 @@
 <?php
 
-use App\Enums\TicketPriority;
 use App\Enums\TicketStatus;
 use App\Models\Employee;
 use App\Models\Ticket;
@@ -30,14 +29,14 @@ it('creates a New ticket on behalf of an employee when no technician is chosen',
         ->set('employeeId', (string) $employee->id)
         ->set('subject', 'Printer keeps jamming')
         ->set('description', 'Tray 2 jams on every job.')
-        ->set('priority', TicketPriority::High->value)
+        ->set('priority', 'high')
         ->call('submit')
         ->assertHasNoErrors()
         ->assertRedirect();
 
     $ticket = Ticket::sole();
     expect($ticket->status)->toBe(TicketStatus::New)
-        ->and($ticket->priority)->toBe(TicketPriority::High)
+        ->and($ticket->priority->key)->toBe('high')
         ->and($ticket->employee_id)->toBe($employee->id)
         ->and($ticket->assigned_to)->toBeNull()
         ->and($ticket->ticket_number)->toStartWith('IT-');

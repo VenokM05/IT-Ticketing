@@ -1,10 +1,10 @@
 <?php
 
-use App\Enums\TicketCategory;
-use App\Enums\TicketPriority;
 use App\Enums\TicketStatus;
 use App\Enums\UserRole;
+use App\Models\Category;
 use App\Models\Employee;
+use App\Models\Priority;
 use App\Models\Ticket;
 use App\Models\User;
 use App\Services\TicketService;
@@ -22,8 +22,8 @@ new #[Layout('components.layouts.app')] #[Title('Submit Ticket')] class extends 
     public string $employeeId = '';
     public string $subject = '';
     public string $description = '';
-    public string $category = TicketCategory::General->value;
-    public string $priority = TicketPriority::Medium->value;
+    public string $category = 'general';
+    public string $priority = 'medium';
     public string $technicianId = '';
     public string $anydeskId = '';
 
@@ -41,8 +41,8 @@ new #[Layout('components.layouts.app')] #[Title('Submit Ticket')] class extends 
                 'employeeId' => ['required', 'integer', 'exists:employees,id'],
                 'subject' => ['required', 'string', 'max:255'],
                 'description' => ['required', 'string', 'max:5000'],
-                'category' => ['required', 'string', 'in:'.implode(',', array_column(TicketCategory::cases(), 'value'))],
-                'priority' => ['required', 'string', 'in:'.implode(',', array_column(TicketPriority::cases(), 'value'))],
+                'category' => ['required', 'string', 'in:'.implode(',', Category::query()->active()->pluck('key')->all())],
+                'priority' => ['required', 'string', 'in:'.implode(',', Priority::query()->active()->pluck('key')->all())],
                 'technicianId' => ['nullable', 'integer', 'exists:users,id'],
                 'anydeskId' => ['nullable', 'string', 'max:60'],
             ],
@@ -57,8 +57,8 @@ new #[Layout('components.layouts.app')] #[Title('Submit Ticket')] class extends 
             'employee_id' => (int) $this->employeeId,
             'subject' => $this->subject,
             'description' => $this->description,
-            'category' => TicketCategory::from($this->category),
-            'priority' => TicketPriority::from($this->priority),
+            'category' => $this->category,
+            'priority' => $this->priority,
             'status' => $this->technicianId !== '' ? TicketStatus::Assigned : TicketStatus::New,
             'assigned_to' => $this->technicianId !== '' ? (int) $this->technicianId : null,
             'anydesk_id' => $this->anydeskId !== '' ? trim($this->anydeskId) : null,
@@ -80,6 +80,8 @@ new #[Layout('components.layouts.app')] #[Title('Submit Ticket')] class extends 
             'employees' => $employees,
             // Lets the form preview the company that will be stamped on the ticket.
             'requester' => $this->employeeId === '' ? null : $employees->firstWhere('id', (int) $this->employeeId),
+            'categories' => Category::query()->active()->ordered()->get(),
+            'priorities' => Priority::query()->active()->ordered()->get(),
             'technicians' => User::query()->where('role', UserRole::Technician->value)->where('is_active', true)->orderBy('name')->get(['id', 'name']),
         ];
     }
@@ -120,13 +122,13 @@ new #[Layout('components.layouts.app')] #[Title('Submit Ticket')] class extends 
 
         <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
             <flux:select wire:model="category" label="Category">
-                @foreach (TicketCategory::cases() as $case)
+                @foreach ($categories as $case)
                     <flux:select.option value="{{ $case->value }}">{{ $case->label() }}</flux:select.option>
                 @endforeach
             </flux:select>
 
             <flux:select wire:model="priority" label="Priority">
-                @foreach (TicketPriority::cases() as $case)
+                @foreach ($priorities as $case)
                     <flux:select.option value="{{ $case->value }}">{{ $case->label() }}</flux:select.option>
                 @endforeach
             </flux:select>

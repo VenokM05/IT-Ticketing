@@ -5,8 +5,6 @@ namespace App\Services;
 use App\Enums\MessageChannel;
 use App\Enums\MessageDirection;
 use App\Enums\MessageType;
-use App\Enums\TicketCategory;
-use App\Enums\TicketPriority;
 use App\Enums\TicketStatus;
 use App\Models\Employee;
 use App\Models\Ticket;
@@ -215,8 +213,8 @@ class WhatsAppInboundService
             'employee_id' => $employee->id,
             'subject' => $subject,
             'description' => $content,
-            'category' => TicketCategory::General,
-            'priority' => TicketPriority::Medium,
+            'category' => 'general',
+            'priority' => 'medium',
             'status' => TicketStatus::New,
         ]);
 

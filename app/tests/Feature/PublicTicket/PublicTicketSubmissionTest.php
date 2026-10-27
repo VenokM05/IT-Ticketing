@@ -1,6 +1,5 @@
 <?php
 
-use App\Enums\TicketCategory;
 use App\Models\Company;
 use App\Models\Ticket;
 use App\Models\User;
@@ -89,7 +88,7 @@ it('stores the chosen problem category and the optional AnyDesk ID', function ()
 
     $ticket = Ticket::sole();
 
-    expect($ticket->category)->toBe(TicketCategory::Printer)
+    expect($ticket->category->key)->toBe('printer')
         // Trimmed on the way in, never blank-padded.
         ->and($ticket->anydesk_id)->toBe('123 456 789');
 });

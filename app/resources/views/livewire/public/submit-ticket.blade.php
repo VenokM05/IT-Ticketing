@@ -1,8 +1,7 @@
 <?php
 
-use App\Enums\TicketCategory;
-use App\Enums\TicketPriority;
 use App\Enums\TicketStatus;
+use App\Models\Category;
 use App\Models\Company;
 use App\Services\TicketService;
 use Illuminate\Support\Facades\RateLimiter;
@@ -27,7 +26,7 @@ new #[Layout('components.layouts.auth')] #[Title('Submit a Ticket')] class exten
     public string $contact = '';
     public string $subject = '';
     public string $description = '';
-    public string $category = TicketCategory::General->value;
+    public string $category = 'general';
     // Optional remote-assistance handle; only collected on the web forms.
     public string $anydeskId = '';
 
@@ -64,7 +63,7 @@ new #[Layout('components.layouts.auth')] #[Title('Submit a Ticket')] class exten
             'contact' => ['required', 'string', 'max:160'],
             'subject' => ['required', 'string', 'max:255'],
             'description' => ['required', 'string', 'max:5000'],
-            'category' => ['required', Rule::in(array_column(TicketCategory::cases(), 'value'))],
+            'category' => ['required', Rule::in(Category::query()->active()->pluck('key')->all())],
             'anydeskId' => ['nullable', 'string', 'max:60'],
         ], [
             'name.required' => 'Please tell us your name.',
@@ -86,8 +85,8 @@ new #[Layout('components.layouts.auth')] #[Title('Submit a Ticket')] class exten
             'company_id' => $match?->id,
             'subject' => trim($this->subject),
             'description' => trim($this->description),
-            'category' => TicketCategory::from($this->category),
-            'priority' => TicketPriority::Medium,
+            'category' => $this->category,
+            'priority' => 'medium',
             'status' => TicketStatus::New,
             'assigned_to' => null,
             'requester_name' => trim($this->name),
@@ -104,7 +103,7 @@ new #[Layout('components.layouts.auth')] #[Title('Submit a Ticket')] class exten
             'name', 'company', 'department', 'position', 'contact',
             'subject', 'description', 'website', 'anydeskId',
         ]);
-        $this->category = TicketCategory::General->value;
+        $this->category = 'general';
     }
 
     public function again(): void
@@ -117,6 +116,7 @@ new #[Layout('components.layouts.auth')] #[Title('Submit a Ticket')] class exten
         return [
             // Suggestions only — a free-text entry that matches nothing is still accepted.
             'companyNames' => Company::query()->active()->orderBy('name')->pluck('name'),
+            'categories' => Category::query()->active()->ordered()->get(),
         ];
     }
 }; ?>
@@ -163,7 +163,7 @@ new #[Layout('components.layouts.auth')] #[Title('Submit a Ticket')] class exten
             {{-- Classification first helps IT route the request; AnyDesk is optional remote help. --}}
             <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <flux:select wire:model="category" label="Category of problem">
-                    @foreach (TicketCategory::cases() as $case)
+                    @foreach ($categories as $case)
                         <flux:select.option value="{{ $case->value }}">{{ $case->label() }}</flux:select.option>
                     @endforeach
                 </flux:select>

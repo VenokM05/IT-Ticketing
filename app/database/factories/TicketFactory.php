@@ -2,10 +2,10 @@
 
 namespace Database\Factories;
 
-use App\Enums\TicketCategory;
-use App\Enums\TicketPriority;
 use App\Enums\TicketStatus;
+use App\Models\Category;
 use App\Models\Employee;
+use App\Models\Priority;
 use App\Models\Ticket;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
@@ -24,8 +24,8 @@ class TicketFactory extends Factory
             'assigned_to' => null,
             'subject' => fake()->sentence(4),
             'description' => fake()->paragraph(),
-            'category' => TicketCategory::General,
-            'priority' => TicketPriority::Medium,
+            'category_id' => Category::resolve('general')->id,
+            'priority_id' => Priority::resolve('medium')->id,
             'status' => TicketStatus::New,
         ];
     }
