@@ -31,6 +31,7 @@
                         <flux:navlist.item icon="wrench-screwdriver" :href="route('staff')" :current="request()->routeIs('staff*')" wire:navigate>Staff</flux:navlist.item>
                         <flux:navlist.item icon="identification" :href="route('relinks')" :current="request()->routeIs('relinks')" wire:navigate>Approvals</flux:navlist.item>
                         <flux:navlist.item icon="chart-bar" :href="route('reports')" :current="request()->routeIs('reports*')" wire:navigate>Reports</flux:navlist.item>
+                        <flux:navlist.item icon="megaphone" :href="route('broadcast')" :current="request()->routeIs('broadcast*')" wire:navigate>Broadcast</flux:navlist.item>
                     </flux:navlist.group>
                 @endif
             </flux:navlist>

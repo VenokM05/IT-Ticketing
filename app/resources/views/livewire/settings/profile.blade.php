@@ -9,6 +9,8 @@ use Livewire\Volt\Component;
 new class extends Component {
     public string $name = '';
     public string $email = '';
+    public bool $notifyEmail = true;
+    public bool $notifyWhatsapp = true;
 
     /**
      * Mount the component.
@@ -17,6 +19,23 @@ new class extends Component {
     {
         $this->name = Auth::user()->name;
         $this->email = Auth::user()->email;
+        $this->notifyEmail = (bool) Auth::user()->notify_email;
+        $this->notifyWhatsapp = (bool) Auth::user()->notify_whatsapp;
+    }
+
+    /**
+     * Persist the caller's per-channel delivery preferences (Phase 7). The in-app
+     * dashboard row is always written; these toggles only gate the email/WhatsApp
+     * mirrors, so opting out never hides an alert from the notifications feed.
+     */
+    public function updateNotificationPreferences(): void
+    {
+        Auth::user()->update([
+            'notify_email' => $this->notifyEmail,
+            'notify_whatsapp' => $this->notifyWhatsapp,
+        ]);
+
+        $this->dispatch('preferences-updated');
     }
 
     /**
@@ -107,6 +126,19 @@ new class extends Component {
                 </div>
 
                 <x-action-message class="me-3" on="profile-updated">
+                    {{ __('Saved.') }}
+                </x-action-message>
+            </div>
+        </form>
+
+        <form wire:submit="updateNotificationPreferences" class="my-6 w-full space-y-4 border-t border-border pt-6">
+            <h3 class="text-sm font-semibold">Notification preferences</h3>
+            <p class="text-sm text-fg-muted">Choose which channels mirror your dashboard alerts.</p>
+            <flux:checkbox wire:model="notifyEmail" label="Email notifications" />
+            <flux:checkbox wire:model="notifyWhatsapp" label="WhatsApp notifications" />
+            <div class="flex items-center gap-4">
+                <flux:button variant="primary" type="submit">{{ __('Save') }}</flux:button>
+                <x-action-message on="preferences-updated">
                     {{ __('Saved.') }}
                 </x-action-message>
             </div>

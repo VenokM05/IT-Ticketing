@@ -41,6 +41,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // Operational reporting — administrator only (Phase 6); gated in the page/controller.
     Volt::route('reports', 'reports.index')->name('reports');
     Route::get('reports/export', ReportExportController::class)->name('reports.export');
+
+    // Incident broadcast to every requester with a live ticket — administrator only.
+    Volt::route('broadcast', 'broadcast.index')->name('broadcast');
 });
 
 Route::middleware(['auth'])->group(function () {

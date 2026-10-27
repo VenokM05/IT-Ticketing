@@ -30,6 +30,8 @@ class User extends Authenticatable // implements MustVerifyEmail
         'company_id',
         'is_active',
         'is_on_call',
+        'notify_email',
+        'notify_whatsapp',
     ];
 
     /**
@@ -55,6 +57,8 @@ class User extends Authenticatable // implements MustVerifyEmail
             'role' => UserRole::class,
             'is_active' => 'boolean',
             'is_on_call' => 'boolean',
+            'notify_email' => 'boolean',
+            'notify_whatsapp' => 'boolean',
         ];
     }
 

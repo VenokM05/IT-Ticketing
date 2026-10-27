@@ -9,6 +9,7 @@ use App\Models\RelinkRequest;
 use App\Models\Ticket;
 use App\Models\TicketStatusHistory;
 use App\Models\User;
+use App\Notifications\TicketEventMail;
 
 /**
  * Creates per-user dashboard notifications with independent read state (PRD §7.8, FR-05).
@@ -50,6 +51,15 @@ class NotificationService
                     'message' => $ticket->subject,
                 ],
             );
+
+            // Email channel, only when the technician has not opted out.
+            if ($technician->notify_email) {
+                $technician->notify(new TicketEventMail(
+                    'Assigned: '.$ticket->ticket_number,
+                    $ticket->subject,
+                    route('tickets.show', $ticket),
+                ));
+            }
         }
     }
 
@@ -135,18 +145,25 @@ class NotificationService
         User::query()
             ->where('role', UserRole::Admin->value)
             ->where('is_active', true)
-            ->each(fn (User $admin) => DashboardNotification::query()->firstOrCreate(
-                [
-                    'user_id' => $admin->id,
-                    'type' => $type->value,
-                    'ticket_id' => $ticket->id,
-                    'ref_id' => $refId,
-                ],
-                [
-                    'title' => $title,
-                    'message' => $message,
-                    'data' => $data,
-                ],
-            ));
+            ->each(function (User $admin) use ($type, $ticket, $title, $message, $refId, $data) {
+                DashboardNotification::query()->firstOrCreate(
+                    [
+                        'user_id' => $admin->id,
+                        'type' => $type->value,
+                        'ticket_id' => $ticket->id,
+                        'ref_id' => $refId,
+                    ],
+                    [
+                        'title' => $title,
+                        'message' => $message,
+                        'data' => $data,
+                    ],
+                );
+
+                // Mirror the alert over email only when the admin has not opted out.
+                if ($admin->notify_email) {
+                    $admin->notify(new TicketEventMail($title, (string) $message, route('tickets.show', $ticket)));
+                }
+            });
     }
 }
