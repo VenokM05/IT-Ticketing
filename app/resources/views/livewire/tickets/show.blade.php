@@ -146,6 +146,7 @@ new #[Layout('components.layouts.app')] #[Title('Ticket')] class extends Compone
             $this->ticket,
             TicketPriority::from($validated['classPriority']),
             TicketCategory::from($validated['classCategory']),
+            auth()->user(),
         );
 
         $this->refreshTicket();

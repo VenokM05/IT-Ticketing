@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\Company;
+use App\Services\AuditLogger;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Validation\Rule;
 use Livewire\Attributes\Layout;
@@ -84,6 +85,7 @@ new #[Layout('components.layouts.app')] #[Title('Companies')] class extends Comp
         ]);
 
         $company = $this->editingId ? Company::find($this->editingId) : new Company;
+        $created = $company->exists === false;
         $company->fill([
             'name' => trim($this->fName),
             'code' => $this->fCode !== '' ? strtoupper(trim($this->fCode)) : null,
@@ -92,6 +94,12 @@ new #[Layout('components.layouts.app')] #[Title('Companies')] class extends Comp
             'is_active' => $this->fActive,
         ]);
         $company->save();
+
+        app(AuditLogger::class)->record(
+            $created ? 'company.created' : 'company.updated',
+            $company,
+            ['name' => $company->name, 'code' => $company->code],
+        );
 
         $this->cancel();
         session()->flash('success', 'Company saved.');
@@ -106,6 +114,8 @@ new #[Layout('components.layouts.app')] #[Title('Companies')] class extends Comp
         // Inactive companies stay referenced by historical tickets; only new
         // enrollments/submissions stop offering them.
         $company->update(['is_active' => ! $company->is_active]);
+
+        app(AuditLogger::class)->record('company.toggled', $company, ['is_active' => $company->is_active]);
 
         session()->flash('success', $company->is_active ? 'Company activated.' : 'Company deactivated.');
     }

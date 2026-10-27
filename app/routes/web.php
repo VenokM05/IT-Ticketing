@@ -44,6 +44,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     // Incident broadcast to every requester with a live ticket — administrator only.
     Volt::route('broadcast', 'broadcast.index')->name('broadcast');
+
+    // Configuration / classification audit trail — administrator only.
+    Volt::route('audit', 'audit.index')->name('audit');
 });
 
 Route::middleware(['auth'])->group(function () {

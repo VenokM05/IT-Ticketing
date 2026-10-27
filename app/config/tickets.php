@@ -40,4 +40,27 @@ return [
 
     // Fraction of an unmet SLA window that, once consumed, flags it "at risk".
     'sla_at_risk_ratio' => (float) env('SLA_AT_RISK_RATIO', 0.75),
+
+    // Attachment hardening (PRD Phase 8, Rec #9): only these MIME types are
+    // accepted when ingesting ticket media; anything else (executables, scripts,
+    // archives) is rejected. Stored on the private disk, never the webroot. Sizes
+    // are capped in kilobytes. Overridable per environment.
+    'attachments' => [
+        'max_size_kb' => (int) env('ATTACHMENT_MAX_SIZE_KB', 20_480),
+        'allowed_mime_types' => [
+            // images
+            'image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/heic', 'image/heif',
+            // pdf
+            'application/pdf',
+            // office documents
+            'application/msword',
+            'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            'application/vnd.ms-excel',
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            'application/vnd.ms-powerpoint',
+            'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+            // plain text notes
+            'text/plain',
+        ],
+    ],
 ];

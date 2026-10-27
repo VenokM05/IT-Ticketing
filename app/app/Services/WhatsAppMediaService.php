@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\Ticket;
 use App\Models\TicketAttachment;
 use App\Models\TicketMessage;
+use App\Support\AttachmentPolicy;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
@@ -20,8 +21,6 @@ use Illuminate\Support\Str;
  */
 class WhatsAppMediaService
 {
-    private const MAX_BYTES = 100_000_000; // 100 MB Cloud API media ceiling.
-
     public function __construct(private readonly WhatsAppCloudApi $api) {}
 
     public function enabled(): bool
@@ -55,14 +54,17 @@ class WhatsAppMediaService
         }
 
         $size = strlen($bytes);
+        $mime = $meta['mime_type'] ?? $media['mime_type'] ?? 'application/octet-stream';
 
-        if ($size === 0 || $size > self::MAX_BYTES) {
+        // Hardening (Phase 8, Rec #9): reject disallowed types and oversized media
+        // before anything touches disk. The message row still stands so intake is
+        // never broken by a bad attachment.
+        if (! AttachmentPolicy::allowsMime($mime) || ! AttachmentPolicy::withinSize($size)) {
             return null;
         }
 
-        $mime = $meta['mime_type'] ?? $media['mime_type'] ?? 'application/octet-stream';
         $original = $meta['filename'] ?? $media['filename'] ?? $this->fallbackName($mediaId, $mime);
-        $path = sprintf('wa-attachments/%d/%s-%s', $ticket->id, (string) Str::uuid(), $this->safeName($original));
+        $path = sprintf('wa-attachments/%d/%s-%s', $ticket->id, (string) Str::uuid(), AttachmentPolicy::sanitizeName($original));
 
         Storage::disk('local')->put($path, $bytes);
 
@@ -89,13 +91,5 @@ class WhatsAppMediaService
         };
 
         return 'whatsapp-media-'.$mediaId.'.'.$extension;
-    }
-
-    /** Strip path separators and control characters from a supplied file name. */
-    private function safeName(string $name): string
-    {
-        $base = Str::of($name)->afterLast('/')->afterLast('\\')->replaceMatches('/[^A-Za-z0-9._-]/', '_')->trim('._');
-
-        return (string) ($base->length() > 0 ? $base : 'media');
     }
 }

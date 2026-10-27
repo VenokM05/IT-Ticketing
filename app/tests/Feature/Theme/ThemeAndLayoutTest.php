@@ -42,7 +42,7 @@ it('renders every primary route over http for an admin', function (string $path)
     $this->actingAs(User::factory()->admin()->create())->get($path)->assertOk();
 })->with([
     '/dashboard', '/tickets', '/tickets/create', '/notifications',
-    '/employees', '/companies', '/staff', '/relinks', '/reports', '/broadcast',
+    '/employees', '/companies', '/staff', '/relinks', '/reports', '/broadcast', '/audit',
     '/settings/profile', '/settings/appearance', '/settings/whatsapp', '/settings/canned-responses',
 ]);
 

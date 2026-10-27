@@ -1,5 +1,7 @@
 <?php
 
+use App\Models\ActivityLog;
+use App\Services\AuditLogger;
 use App\Services\WhatsAppSettings;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
@@ -36,6 +38,11 @@ new #[Layout('components.layouts.app')] #[Title('WhatsApp Settings')] class exte
 
         WhatsAppSettings::setAccessToken($this->apiKey);
 
+        // Audit records only the masked tail, never the secret itself.
+        app(AuditLogger::class)->record('whatsapp.token_updated', null, [
+            'masked' => WhatsAppSettings::masked($this->apiKey),
+        ]);
+
         $this->reset('apiKey');
         session()->flash('whatsapp-saved', 'WhatsApp API key saved. It takes effect immediately.');
     }
@@ -46,6 +53,8 @@ new #[Layout('components.layouts.app')] #[Title('WhatsApp Settings')] class exte
 
         WhatsAppSettings::clearAccessToken();
 
+        app(AuditLogger::class)->record('whatsapp.token_cleared');
+
         session()->flash('whatsapp-saved', 'Stored WhatsApp API key removed.');
     }
 
@@ -54,6 +63,12 @@ new #[Layout('components.layouts.app')] #[Title('WhatsApp Settings')] class exte
         return [
             'stored' => WhatsAppSettings::hasStoredAccessToken(),
             'masked' => WhatsAppSettings::masked(WhatsAppSettings::accessToken()),
+            'audit' => ActivityLog::query()
+                ->where('event', 'like', 'whatsapp.%')
+                ->with('actor')
+                ->latest('created_at')
+                ->limit(5)
+                ->get(),
         ];
     }
 }; ?>
@@ -113,6 +128,23 @@ new #[Layout('components.layouts.app')] #[Title('WhatsApp Settings')] class exte
                     @endif
                 </div>
             </form>
+
+            {{-- Compact audit trail of credential changes (Phase 8, Rec #10). --}}
+            <div class="card p-4">
+                <h3 class="text-sm font-semibold">Recent changes</h3>
+                @if ($audit->isEmpty())
+                    <p class="mt-2 text-sm text-fg-muted">No WhatsApp settings changes recorded yet.</p>
+                @else
+                    <ul class="mt-2 divide-y divide-border text-sm">
+                        @foreach ($audit as $row)
+                            <li class="flex items-center justify-between py-2">
+                                <span>{{ $row->event === 'whatsapp.token_updated' ? 'API key updated' : 'API key removed' }}</span>
+                                <span class="text-fg-muted">{{ $row->actor?->name ?? 'System' }} · {{ $row->created_at?->diffForHumans() }}</span>
+                            </li>
+                        @endforeach
+                    </ul>
+                @endif
+            </div>
         </div>
     </x-settings.layout>
 </div>

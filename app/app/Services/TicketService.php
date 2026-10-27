@@ -28,6 +28,7 @@ class TicketService
         private readonly TicketNumberGenerator $numbers,
         private readonly NotificationService $notifications,
         private readonly WhatsAppOutboundService $whatsapp,
+        private readonly AuditLogger $audit,
     ) {}
 
     /**
@@ -127,8 +128,12 @@ class TicketService
         Ticket $ticket,
         TicketPriority $priority,
         TicketCategory $category,
+        ?User $actor = null,
     ): Ticket {
         $priorityChanged = $ticket->priority !== $priority;
+        $categoryChanged = $ticket->category !== $category;
+
+        $before = ['priority' => $ticket->priority?->value, 'category' => $ticket->category?->value];
 
         $ticket->update([
             'priority' => $priority,
@@ -137,6 +142,13 @@ class TicketService
 
         if ($priorityChanged) {
             $this->applySla($ticket->refresh());
+        }
+
+        if ($priorityChanged || $categoryChanged) {
+            $this->audit->record('ticket.classification_updated', $ticket, [
+                'before' => $before,
+                'after' => ['priority' => $priority->value, 'category' => $category->value],
+            ], $actor?->id);
         }
 
         return $ticket;
@@ -223,9 +235,22 @@ class TicketService
     ): Ticket {
         $updated = DB::transaction(function () use ($ticket, $to, $actor, $remark) {
             $fresh = Ticket::query()->whereKey($ticket->id)->lockForUpdate()->firstOrFail();
+            $from = $fresh->status;
 
-            return $this->applyTransition($fresh, $to, $actor, $remark);
+            return [$this->applyTransition($fresh, $to, $actor, $remark), $from];
         });
+
+        [$updated, $from] = $updated;
+
+        // Audit manual status edits (Phase 8, Rec #10); transitions without an
+        // actor (e.g. a WhatsApp command) already carry their own history row.
+        if ($actor !== null) {
+            $this->audit->record('ticket.status_changed', $updated, [
+                'from' => $from?->value,
+                'to' => $to->value,
+                'remark' => $remark,
+            ], $actor->id);
+        }
 
         if ($notifyEmployee) {
             $this->notifyEmployeeTransition($updated, $to);
