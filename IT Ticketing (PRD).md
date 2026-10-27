@@ -842,6 +842,7 @@ This section is normative. It defines how employees are registered, how unknown 
 - Bulk CSV import shall be provided for the initial load and periodic HR sync. Import columns: name, whatsapp_number (E.164), department, company, position, location, email, is_active. The `company` column is optional (legacy files without it still import) and is matched against `companies` (Section 7.13) by name or code; the import shall fail with a report of unmapped companies rather than create ad-hoc values. Imported department names shall map to `departments` (Section 7.11); the import shall fail with a report of unmapped departments rather than create ad-hoc values.
 - The `whatsapp_number` shall be stored normalized in E.164 format (for example `639171234567`) and must be unique across active employee records.
 - Employees cannot self-register in the initial release.
+- A public, no-login web request form (`/submit-ticket`) is available for non-enrolled visitors. It creates a ticket with no `employee_id`, storing a self-declared requester snapshot (name, company, department, position, contact) instead. This is **not** employee registration — no `employees` record is created. The typed company is matched to an existing active company (by name or code) when possible; otherwise the ticket is filed under the "Unassigned" reporting bucket. The endpoint is rate-limited per IP and uses a honeypot to blunt spam.
 
 ### 9.2 Unknown-Sender Rule
 

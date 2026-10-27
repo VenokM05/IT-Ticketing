@@ -260,13 +260,12 @@ new #[Layout('components.layouts.app')] #[Title('Ticket')] class extends Compone
             <div class="rounded-xl border border-zinc-200 bg-white p-4 dark:border-zinc-700 dark:bg-zinc-900">
                 <h2 class="text-sm font-semibold">Requester</h2>
                 <dl class="mt-2 grid grid-cols-2 gap-x-4 gap-y-1 text-sm sm:grid-cols-3">
-                    <div><dt class="text-zinc-500 dark:text-zinc-400">Name</dt><dd>{{ $ticket->employee?->name ?? '—' }}</dd></div>
-                    <div><dt class="text-zinc-500 dark:text-zinc-400">Company</dt><dd>{{ $ticket->company?->name ?? '—' }}</dd></div>
-                    <div><dt class="text-zinc-500 dark:text-zinc-400">WhatsApp</dt><dd>{{ $ticket->employee?->whatsapp_number ?? '—' }}</dd></div>
-                    <div><dt class="text-zinc-500 dark:text-zinc-400">Department</dt><dd>{{ $ticket->employee?->department?->name ?? '—' }}</dd></div>
-                    <div><dt class="text-zinc-500 dark:text-zinc-400">Position</dt><dd>{{ $ticket->employee?->position ?? '—' }}</dd></div>
-                    <div><dt class="text-zinc-500 dark:text-zinc-400">Location</dt><dd>{{ $ticket->employee?->location ?? '—' }}</dd></div>
-                    <div><dt class="text-zinc-500 dark:text-zinc-400">Email</dt><dd>{{ $ticket->employee?->email ?? '—' }}</dd></div>
+                    <div><dt class="text-zinc-500 dark:text-zinc-400">Name</dt><dd>{{ $ticket->requesterName() ?? '—' }}</dd></div>
+                    <div><dt class="text-zinc-500 dark:text-zinc-400">Company</dt><dd>{{ $ticket->companyLabel() }}</dd></div>
+                    <div><dt class="text-zinc-500 dark:text-zinc-400">Contact</dt><dd>{{ $ticket->requesterContact() ?? '—' }}</dd></div>
+                    <div><dt class="text-zinc-500 dark:text-zinc-400">Department</dt><dd>{{ $ticket->requesterDepartment() ?? '—' }}</dd></div>
+                    <div><dt class="text-zinc-500 dark:text-zinc-400">Position</dt><dd>{{ $ticket->requesterPosition() ?? '—' }}</dd></div>
+                    <div><dt class="text-zinc-500 dark:text-zinc-400">Source</dt><dd>{{ $ticket->employee ? 'Enrolled' : 'Web request' }}</dd></div>
                     <div><dt class="text-zinc-500 dark:text-zinc-400">Created</dt><dd>{{ $ticket->created_at->format('Y-m-d H:i') }}</dd></div>
                 </dl>
                 <h3 class="mt-4 text-sm font-semibold">Original request</h3>

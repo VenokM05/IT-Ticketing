@@ -52,9 +52,11 @@ new #[Layout('components.layouts.app')] #[Title('Tickets')] class extends Compon
                     $inner->where('ticket_number', 'like', "%{$this->search}%")
                         ->orWhere('subject', 'like', "%{$this->search}%");
 
-                    // Employee search is admin-only (§10.2 "where authorized").
+                    // Requester search is admin-only (§10.2 "where authorized"). Covers both
+                    // enrolled employees and self-declared public requesters.
                     if ($isAdmin) {
-                        $inner->orWhereHas('employee', fn (Builder $e) => $e->where('name', 'like', "%{$this->search}%"));
+                        $inner->orWhereHas('employee', fn (Builder $e) => $e->where('name', 'like', "%{$this->search}%"))
+                            ->orWhere('requester_name', 'like', "%{$this->search}%");
                     }
                 });
             })
@@ -139,7 +141,7 @@ new #[Layout('components.layouts.app')] #[Title('Tickets')] class extends Compon
                 <thead class="bg-zinc-50 text-left dark:bg-zinc-800/50">
                     <tr>
                         <th class="px-4 py-2 font-medium text-zinc-500 dark:text-zinc-400">Ticket</th>
-                        <th class="px-4 py-2 font-medium text-zinc-500 dark:text-zinc-400">Employee</th>
+                        <th class="px-4 py-2 font-medium text-zinc-500 dark:text-zinc-400">Requester</th>
                         <th class="px-4 py-2 font-medium text-zinc-500 dark:text-zinc-400">Company</th>
                         <th class="px-4 py-2 font-medium text-zinc-500 dark:text-zinc-400">Category</th>
                         <th class="px-4 py-2 font-medium text-zinc-500 dark:text-zinc-400">Priority</th>
@@ -157,8 +159,8 @@ new #[Layout('components.layouts.app')] #[Title('Tickets')] class extends Compon
                                 </a>
                                 <div class="text-zinc-500 dark:text-zinc-400">{{ $ticket->subject }}</div>
                             </td>
-                            <td class="px-4 py-2">{{ $ticket->employee?->name ?? '—' }}</td>
-                            <td class="px-4 py-2">{{ $ticket->company?->label() ?? '—' }}</td>
+                            <td class="px-4 py-2">{{ $ticket->requesterName() ?? '—' }}</td>
+                            <td class="px-4 py-2">{{ $ticket->companyLabel() }}</td>
                             <td class="px-4 py-2">{{ $ticket->category->label() }}</td>
                             <td class="px-4 py-2"><flux:badge :color="match ($ticket->priority) { \App\Enums\TicketPriority::Critical => 'red', \App\Enums\TicketPriority::High => 'orange', default => 'zinc' }" size="sm">{{ $ticket->priority->label() }}</flux:badge></td>
                             <td class="px-4 py-2"><flux:badge :color="match ($ticket->status) { \App\Enums\TicketStatus::Closed => 'zinc', \App\Enums\TicketStatus::Resolved => 'green', \App\Enums\TicketStatus::InProgress => 'blue', \App\Enums\TicketStatus::Pending => 'amber', default => 'purple' }" size="sm">{{ $ticket->status->label() }}</flux:badge></td>

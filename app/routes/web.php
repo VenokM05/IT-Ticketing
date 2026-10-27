@@ -8,6 +8,12 @@ Route::get('/', function () {
     return view('welcome');
 })->name('home');
 
+// Public, no-login ticket submission (the "submit-ticket" web form). Throttled to
+// blunt spam on an open endpoint; the page also rate-limits and honeypots per submit.
+Volt::route('submit-ticket', 'public.submit-ticket')
+    ->middleware('throttle:20,1')
+    ->name('public.submit-ticket');
+
 Route::middleware(['auth', 'verified'])->group(function () {
     Volt::route('dashboard', 'dashboard')->name('dashboard');
     Volt::route('notifications', 'notifications')->name('notifications');

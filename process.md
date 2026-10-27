@@ -16,9 +16,20 @@ company so the IT Admin can tell which company a request came from.
 
 ## 2. Web ticket submission
 
-- The "submit-ticket.php" equivalent is the dashboard page **/tickets/create** (Livewire). The admin picks the
-  requester (employee); the form previews that person's Company / Department / Position and the created ticket
-  inherits the company the same way WhatsApp tickets do.
+There are two web intake paths:
+
+- **Public, no-login form** at **/submit-ticket** (the literal "submit-ticket" page). Any visitor submits without
+  an account, typing their own **Name, Company, Department, Position, contact, subject and problem**. The requester
+  is not enrolled, so the ticket is stored with no `employee_id` and a self-declared snapshot. The typed company is
+  **matched to an active company by name (case-insensitive) or code**; a match is stamped as the ticket's company,
+  anything else is filed under the **"Unassigned"** bucket (the claimed name is still shown on the ticket). The form
+  is protected by a per-IP throttle (5/min + route `throttle:20,1`) and a honeypot. Submitters get a ticket number
+  to quote; they cannot open the dashboard.
+- **Admin on-behalf form** at **/tickets/create** (TicketPolicy::create). The admin picks an enrolled employee; the
+  form previews that person's Company / Department / Position and the ticket inherits the company exactly like
+  WhatsApp intake.
+
+Both paths funnel through `TicketService::createTicket`, so company attribution stays in one place.
 
 ## 3. IT Admin dashboard & status updates
 

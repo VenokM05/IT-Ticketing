@@ -29,6 +29,12 @@ class Ticket extends Model
         'started_at',
         'resolved_at',
         'closed_at',
+        // Self-declared requester snapshot for public, no-login submissions.
+        'requester_name',
+        'requester_contact',
+        'requester_company',
+        'requester_department',
+        'requester_position',
     ];
 
     protected function casts(): array
@@ -99,6 +105,50 @@ class Ticket extends Model
     public function isOpen(): bool
     {
         return $this->status->isOpen();
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Unified requester display
+    |--------------------------------------------------------------------------
+    |
+    | A ticket is either tied to an enrolled employee (WhatsApp / admin intake) or
+    | carries only the self-declared snapshot from a public, no-login submission.
+    | These accessors prefer the enrollment and fall back to the snapshot, so the
+    | dashboard and detail views need no branching.
+    */
+
+    public function requesterName(): ?string
+    {
+        return $this->employee?->name ?? $this->requester_name;
+    }
+
+    public function requesterContact(): ?string
+    {
+        return $this->employee?->whatsapp_number
+            ?? $this->employee?->email
+            ?? $this->requester_contact;
+    }
+
+    public function requesterDepartment(): ?string
+    {
+        return $this->employee?->department?->name ?? $this->requester_department;
+    }
+
+    public function requesterPosition(): ?string
+    {
+        return $this->employee?->position ?? $this->requester_position;
+    }
+
+    /**
+     * The company label: the stamped tag when known, the typed claim when the
+     * public request named an unrecognised company, else the Unassigned bucket.
+     */
+    public function companyLabel(): string
+    {
+        return $this->company?->label()
+            ?? $this->requester_company
+            ?? 'Unassigned';
     }
 
     public function hasStarted(): bool

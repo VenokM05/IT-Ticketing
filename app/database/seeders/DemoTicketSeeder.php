@@ -143,6 +143,32 @@ class DemoTicketSeeder extends Seeder
 
         // Pending (waiting on user info).
         $make('Wi-Fi drops near pantry', 'Connection drops daily around 10am.', 1);
+
+        // Public, no-login web requests (process.md item 2): one whose typed company
+        // matches a real one, and one that names an unknown company and so files
+        // under the "Unassigned" bucket. Neither is tied to an enrolled employee.
+        $public = function (string $name, string $claim, string $contact, string $subject, string $body) use ($service, $companies) {
+            $needle = mb_strtolower($claim);
+            $match = $companies->first(fn (Company $c) => mb_strtolower($c->name) === $needle);
+
+            return $service->createTicket([
+                'company_id' => $match?->id,
+                'subject' => $subject,
+                'description' => $body,
+                'requester_name' => $name,
+                'requester_contact' => $contact,
+                'requester_company' => $match ? null : $claim,
+            ]);
+        };
+
+        $public(
+            'Grace Lim', 'Acme Manufacturing', 'grace.lim@example.test',
+            'Visitor Wi-Fi password', 'Reception needs the guest Wi-Fi password for a client meeting.'
+        );
+        $public(
+            'Sam Rivera', 'Wayne Enterprises', '639170000000',
+            'Projector has no signal', 'Conference room projector shows no signal over HDMI.'
+        );
     }
 
     private function user(string $name, string $email, UserRole $role, ?Company $company = null): User
