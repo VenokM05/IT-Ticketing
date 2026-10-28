@@ -41,6 +41,8 @@ class Ticket extends Model
         'requester_company',
         'requester_department',
         'requester_position',
+        // Optional email captured at public intake for the receipt + link recovery.
+        'requester_email',
         // Optional remote-assistance handle supplied at intake (web forms).
         'anydesk_id',
     ];
@@ -152,7 +154,16 @@ class Ticket extends Model
     {
         return $this->employee?->whatsapp_number
             ?? $this->employee?->email
-            ?? $this->requester_contact;
+            ?? $this->requester_contact
+            ?? $this->requester_email;
+    }
+
+    /**
+     * The address the intake receipt was mailed to, when the requester gave one.
+     */
+    public function requesterEmail(): ?string
+    {
+        return $this->employee?->email ?? $this->requester_email;
     }
 
     public function requesterDepartment(): ?string

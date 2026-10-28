@@ -41,6 +41,26 @@ return [
     // Fraction of an unmet SLA window that, once consumed, flags it "at risk".
     'sla_at_risk_ratio' => (float) env('SLA_AT_RISK_RATIO', 0.75),
 
+    /*
+    |--------------------------------------------------------------------------
+    | Public intake (the no-login submit-ticket form)
+    |--------------------------------------------------------------------------
+    |
+    | "min_fill_seconds" is the time-on-page bot defence: the form remembers when it
+    | was opened and silently discards a post that arrives sooner, because no human
+    | can read and fill every field that fast. Set to 0 to disable (the test suite
+    | does exactly that — see Tests\TestCase).
+    |
+    | "duplicate_window_hours" is how far back the soft duplicate check looks for an
+    | open request from the same requester with the same subject; a match asks the
+    | requester to confirm instead of filing a second ticket.
+    |
+    */
+    'intake' => [
+        'min_fill_seconds' => (int) env('INTAKE_MIN_FILL_SECONDS', 5),
+        'duplicate_window_hours' => (int) env('INTAKE_DUPLICATE_WINDOW_HOURS', 24),
+    ],
+
     // Attachment hardening (PRD Phase 8, Rec #9): only these MIME types are
     // accepted when ingesting ticket media; anything else (executables, scripts,
     // archives) is rejected. Stored on the private disk, never the webroot. Sizes

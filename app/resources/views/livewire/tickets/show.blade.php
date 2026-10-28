@@ -323,6 +323,10 @@ new #[Layout('components.layouts.app')] #[Title('Ticket')] class extends Compone
                     <div><dt class="text-fg-muted">Name</dt><dd>{{ $ticket->requesterName() ?? '—' }}</dd></div>
                     <div><dt class="text-fg-muted">Company</dt><dd>{{ $ticket->companyLabel() }}</dd></div>
                     <div><dt class="text-fg-muted">Contact</dt><dd>{{ $ticket->requesterContact() ?? '—' }}</dd></div>
+                    {{-- Intake email: where the public receipt (number + tracking link) went. --}}
+                    @if ($ticket->requester_email)
+                        <div><dt class="text-fg-muted">Email</dt><dd>{{ $ticket->requester_email }}</dd></div>
+                    @endif
                     <div><dt class="text-fg-muted">Department</dt><dd>{{ $ticket->requesterDepartment() ?? '—' }}</dd></div>
                     <div><dt class="text-fg-muted">Position</dt><dd>{{ $ticket->requesterPosition() ?? '—' }}</dd></div>
                     @if ($ticket->anydesk_id)
