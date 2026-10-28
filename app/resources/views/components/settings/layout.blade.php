@@ -5,6 +5,7 @@
             <flux:navlist.item href="{{ route('settings.password') }}" wire:navigate>Password</flux:navlist.item>
             <flux:navlist.item href="{{ route('settings.appearance') }}" wire:navigate>Appearance</flux:navlist.item>
             @if (auth()->user()->isAdmin())
+                <flux:navlist.item href="{{ route('settings.branding') }}" wire:navigate>Branding</flux:navlist.item>
                 <flux:navlist.item href="{{ route('settings.whatsapp') }}" wire:navigate>WhatsApp</flux:navlist.item>
                 <flux:navlist.item href="{{ route('settings.canned-responses') }}" wire:navigate>Canned Responses</flux:navlist.item>
             @endif

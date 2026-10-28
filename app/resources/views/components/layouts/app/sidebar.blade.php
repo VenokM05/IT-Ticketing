@@ -81,6 +81,7 @@
                     <flux:menu.item href="/settings/profile" icon="cog" wire:navigate>Settings</flux:menu.item>
                     <flux:menu.item href="/settings/appearance" icon="sun" wire:navigate>Appearance</flux:menu.item>
                     @if (auth()->user()->isAdmin())
+                        <flux:menu.item href="{{ route('settings.branding') }}" icon="swatch" wire:navigate>Branding</flux:menu.item>
                         <flux:menu.item href="{{ route('settings.whatsapp') }}" icon="chat-bubble-left-right" wire:navigate>WhatsApp</flux:menu.item>
                         <flux:menu.item href="{{ route('settings.canned-responses') }}" icon="clipboard-document-list" wire:navigate>Canned Responses</flux:menu.item>
                         <flux:menu.item href="{{ route('settings.categories') }}" icon="tag" wire:navigate>Categories</flux:menu.item>

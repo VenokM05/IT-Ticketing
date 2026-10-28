@@ -3,14 +3,16 @@
 use App\Models\Company;
 use App\Services\AuditLogger;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
 use Livewire\Volt\Component;
+use Livewire\WithFileUploads;
 use Livewire\WithPagination;
 
 new #[Layout('components.layouts.app')] #[Title('Companies')] class extends Component {
-    use WithPagination;
+    use WithFileUploads, WithPagination;
 
     public bool $showForm = false;
 
@@ -20,6 +22,10 @@ new #[Layout('components.layouts.app')] #[Title('Companies')] class extends Comp
     public string $fEmail = '';
     public string $fLocation = '';
     public bool $fActive = true;
+
+    // Per-company logo upload (temporary file) + an explicit removal request.
+    public $logo = null;
+    public bool $removeLogo = false;
 
     public string $search = '';
 
@@ -48,7 +54,8 @@ new #[Layout('components.layouts.app')] #[Title('Companies')] class extends Comp
     {
         $this->guard();
 
-        $this->reset(['editingId', 'fName', 'fCode', 'fEmail', 'fLocation']);
+        $this->reset(['editingId', 'fName', 'fCode', 'fEmail', 'fLocation', 'logo']);
+        $this->removeLogo = false;
         $this->fActive = true;
         $this->showForm = true;
     }
@@ -60,6 +67,8 @@ new #[Layout('components.layouts.app')] #[Title('Companies')] class extends Comp
         $company = Company::findOrFail($id);
 
         $this->resetErrorBag();
+        $this->reset('logo');
+        $this->removeLogo = false;
         $this->editingId = $company->id;
         $this->fName = $company->name;
         $this->fCode = (string) $company->code;
@@ -71,7 +80,8 @@ new #[Layout('components.layouts.app')] #[Title('Companies')] class extends Comp
 
     public function cancel(): void
     {
-        $this->reset(['showForm', 'editingId', 'fName', 'fCode', 'fEmail', 'fLocation']);
+        $this->reset(['showForm', 'editingId', 'fName', 'fCode', 'fEmail', 'fLocation', 'logo']);
+        $this->removeLogo = false;
     }
 
     public function save(): void
@@ -82,6 +92,7 @@ new #[Layout('components.layouts.app')] #[Title('Companies')] class extends Comp
         $this->validate([
             'fName' => ['required', 'string', 'max:255'],
             'fCode' => ['nullable', 'string', 'max:16', Rule::unique('companies', 'code')->ignore($this->editingId)],
+            'logo' => ['nullable', 'image', 'max:4096', 'mimes:png,jpg,jpeg,webp,gif'],
         ]);
 
         $company = $this->editingId ? Company::find($this->editingId) : new Company;
@@ -95,10 +106,23 @@ new #[Layout('components.layouts.app')] #[Title('Companies')] class extends Comp
         ]);
         $company->save();
 
+        // Logo handling: an upload replaces the current file; the remove checkbox
+        // clears it. Files stay on the private disk, keyed by company id.
+        if ($this->logo) {
+            $old = $company->logo_path;
+            $company->update(['logo_path' => $this->logo->store('company-logos/'.$company->id, 'local')]);
+            if ($old) {
+                Storage::disk('local')->delete($old);
+            }
+        } elseif ($this->removeLogo && $company->logo_path) {
+            Storage::disk('local')->delete($company->logo_path);
+            $company->update(['logo_path' => null]);
+        }
+
         app(AuditLogger::class)->record(
             $created ? 'company.created' : 'company.updated',
             $company,
-            ['name' => $company->name, 'code' => $company->code],
+            ['name' => $company->name, 'code' => $company->code, 'logo' => $company->logo_path !== null],
         );
 
         $this->cancel();
@@ -130,6 +154,7 @@ new #[Layout('components.layouts.app')] #[Title('Companies')] class extends Comp
                     ->orWhere('code', 'like', "%{$this->search}%")))
                 ->orderBy('name')
                 ->paginate(15),
+            'editing' => $this->editingId ? Company::find($this->editingId) : null,
         ];
     }
 }; ?>
@@ -158,6 +183,27 @@ new #[Layout('components.layouts.app')] #[Title('Companies')] class extends Comp
             <div class="mt-3">
                 <flux:checkbox wire:model="fActive" label="Active" />
             </div>
+
+            {{-- Per-company logo (optional). Stored on the private disk, served inline. --}}
+            <div class="mt-3 flex flex-col gap-2">
+                <div class="flex items-center gap-3">
+                    <div class="flex size-12 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-border bg-surface-muted">
+                        @if ($logo?->isPreviewable())
+                            <img src="{{ $logo->temporaryUrl() }}" alt="Preview" class="size-full object-contain" />
+                        @elseif ($editing?->hasLogo())
+                            <img src="{{ route('companies.logo', $editing) }}" alt="{{ $editing->name }}" class="size-full object-contain" />
+                        @else
+                            <span class="text-xs text-fg-subtle">None</span>
+                        @endif
+                    </div>
+                    <flux:input wire:model="logo" type="file" accept="image/*" label="Logo" />
+                </div>
+                @error('logo') <p class="text-xs text-red-600">{{ $message }}</p> @enderror
+                @if ($editing?->hasLogo())
+                    <flux:checkbox wire:model="removeLogo" label="Remove current logo" />
+                @endif
+            </div>
+
             <div class="mt-3 flex gap-2">
                 <flux:button wire:click="save" variant="primary">Save</flux:button>
                 <flux:button wire:click="cancel" variant="subtle">Cancel</flux:button>
@@ -187,11 +233,18 @@ new #[Layout('components.layouts.app')] #[Title('Companies')] class extends Comp
                     @forelse ($companies as $company)
                         <tr>
                             <td class="px-4 py-2">
-                                <span class="font-medium">{{ $company->name }}</span>
-                                @if ($company->code)
-                                    <flux:badge size="sm" color="zinc" class="ml-1">{{ $company->code }}</flux:badge>
-                                @endif
-                                <div class="text-xs text-fg-muted">{{ $company->email }}{{ $company->location ? ' · '.$company->location : '' }}</div>
+                                <div class="flex items-center gap-2">
+                                    @if ($company->hasLogo())
+                                        <img src="{{ route('companies.logo', $company) }}" alt="{{ $company->name }}" class="size-6 shrink-0 rounded object-contain" />
+                                    @endif
+                                    <div class="min-w-0">
+                                        <span class="font-medium">{{ $company->name }}</span>
+                                        @if ($company->code)
+                                            <flux:badge size="sm" color="zinc" class="ml-1">{{ $company->code }}</flux:badge>
+                                        @endif
+                                        <div class="text-xs text-fg-muted">{{ $company->email }}{{ $company->location ? ' · '.$company->location : '' }}</div>
+                                    </div>
+                                </div>
                             </td>
                             <td class="px-4 py-2">{{ $company->employees_count }}</td>
                             <td class="px-4 py-2">{{ $company->tickets_count }}</td>

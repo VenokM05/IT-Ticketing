@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\LogoController;
 use App\Http\Controllers\ReportExportController;
 use Illuminate\Support\Facades\Route;
 use Livewire\Volt\Volt;
@@ -13,6 +14,11 @@ Route::get('/', function () {
 Volt::route('submit-ticket', 'public.submit-ticket')
     ->middleware('throttle:20,1')
     ->name('public.submit-ticket');
+
+// Brand logos, streamed from the private disk. Public so they render on guest
+// shells (login, register, intake); a missing logo simply 404s.
+Route::get('branding/logo', [LogoController::class, 'branding'])->name('branding.logo');
+Route::get('companies/{company}/logo', [LogoController::class, 'company'])->name('companies.logo');
 
 // Tokenized self-service lookup (Phase 10): the magic link a public requester is
 // handed at intake. The opaque token is the only credential; throttled to blunt
@@ -74,6 +80,9 @@ Route::middleware(['auth'])->group(function () {
 
     // Knowledge base self-help articles — administrator only (enforced in the page).
     Volt::route('settings/knowledge-base', 'settings.knowledge-base')->name('settings.knowledge-base');
+
+    // Project title + brand logo (global branding) — administrator only.
+    Volt::route('settings/branding', 'settings.branding')->name('settings.branding');
 });
 
 require __DIR__.'/auth.php';

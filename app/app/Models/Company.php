@@ -20,6 +20,7 @@ class Company extends Model
         'code',
         'email',
         'location',
+        'logo_path',
         'is_active',
     ];
 
@@ -56,6 +57,12 @@ class Company extends Model
     public function label(): string
     {
         return $this->code ?: $this->name;
+    }
+
+    /** True when a custom logo image has been uploaded for this company. */
+    public function hasLogo(): bool
+    {
+        return $this->logo_path !== null && $this->logo_path !== '';
     }
 
     /**
