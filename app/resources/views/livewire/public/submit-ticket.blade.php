@@ -7,6 +7,7 @@ use App\Models\EmployeeToken;
 use App\Models\KbArticle;
 use App\Services\TicketService;
 use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
@@ -23,6 +24,12 @@ use Livewire\Volt\Component;
 new #[Layout('components.layouts.auth')] #[Title('Submit a Ticket')] class extends Component {
     public string $name = '';
     public string $company = '';
+    // Company is chosen through the mandatory picker modal (null until picked).
+    public ?int $companyId = null;
+    public bool $companyPicker = false;
+    public bool $manualCompany = false;
+    // Filters the picker list when there are many companies to choose from.
+    public string $companySearch = '';
     public string $department = '';
     public string $position = '';
     public string $contact = '';
@@ -41,6 +48,47 @@ new #[Layout('components.layouts.auth')] #[Title('Submit a Ticket')] class exten
     public ?string $trackUrl = null;
 
     public ?string $submittedCategory = null;
+
+    public function mount(): void
+    {
+        // The company is mandatory: open the picker immediately so the first thing
+        // a requester does is say which company they belong to. The modal has no
+        // dismiss affordance, so it can only be left by making a choice.
+        $this->companyPicker = $this->company === '';
+    }
+
+    public function openCompanyPicker(): void
+    {
+        $this->companySearch = '';
+        $this->companyPicker = true;
+    }
+
+    public function chooseCompany(int $companyId): void
+    {
+        $company = Company::query()->active()->find($companyId);
+
+        if ($company === null) {
+            return;
+        }
+
+        $this->companyId = $company->id;
+        $this->company = $company->name;
+        $this->manualCompany = false;
+        $this->companySearch = '';
+        $this->companyPicker = false;
+        $this->resetErrorBag('company');
+    }
+
+    public function chooseOther(): void
+    {
+        // Escape hatch for a company that is not enrolled yet — a name is still
+        // required before the request can be filed.
+        $this->companyId = null;
+        $this->company = '';
+        $this->manualCompany = true;
+        $this->companySearch = '';
+        $this->companyPicker = false;
+    }
 
     public function submit(): void
     {
@@ -80,12 +128,17 @@ new #[Layout('components.layouts.auth')] #[Title('Submit a Ticket')] class exten
             'description.required' => 'Please describe the issue.',
         ]);
 
-        // Match the typed company to an active record by name or code (case-insensitive).
-        $needle = mb_strtolower(trim($this->company));
-        $match = Company::query()->active()->get()->first(
-            fn (Company $c) => mb_strtolower($c->name) === $needle
-                || ($c->code !== null && mb_strtolower($c->code) === $needle),
-        );
+        // Prefer the company chosen in the picker; fall back to matching the typed
+        // name against an active record by name or code (case-insensitive).
+        if ($this->companyId !== null) {
+            $match = Company::query()->active()->find($this->companyId);
+        } else {
+            $needle = mb_strtolower(trim($this->company));
+            $match = Company::query()->active()->get()->first(
+                fn (Company $c) => mb_strtolower($c->name) === $needle
+                    || ($c->code !== null && mb_strtolower($c->code) === $needle),
+            );
+        }
 
         $ticket = app(TicketService::class)->createTicket([
             // No enrolled employee; company stamped from the match (null => Unassigned).
@@ -113,14 +166,16 @@ new #[Layout('components.layouts.auth')] #[Title('Submit a Ticket')] class exten
 
         $this->reset([
             'name', 'company', 'department', 'position', 'contact',
-            'subject', 'description', 'website', 'anydeskId',
+            'subject', 'description', 'website', 'anydeskId', 'companyId',
         ]);
+        $this->manualCompany = false;
         $this->category = 'general';
     }
 
     public function again(): void
     {
-        $this->reset(['ticketNumber', 'trackUrl', 'submittedCategory']);
+        $this->reset(['ticketNumber', 'trackUrl', 'submittedCategory', 'companySearch']);
+        $this->companyPicker = true;
     }
 
     public function with(): array
@@ -128,6 +183,14 @@ new #[Layout('components.layouts.auth')] #[Title('Submit a Ticket')] class exten
         return [
             // Suggestions only — a free-text entry that matches nothing is still accepted.
             'companyNames' => Company::query()->active()->orderBy('name')->pluck('name'),
+            // Full records for the picker modal (name + logo + code), narrowed by
+            // the search box so a long list stays easy to scan.
+            'companies' => Company::query()->active()
+                ->when($this->companySearch, fn ($q) => $q->where(fn ($i) => $i
+                    ->where('name', 'like', "%{$this->companySearch}%")
+                    ->orWhere('code', 'like', "%{$this->companySearch}%")))
+                ->orderBy('name')->get(),
+            'selectedCompany' => $this->companyId !== null ? Company::query()->find($this->companyId) : null,
             'categories' => Category::query()->active()->ordered()->get(),
             // Knowledge-base self-help: react to the live selection, or to the
             // category the submitted request was filed under on the receipt.
@@ -139,6 +202,57 @@ new #[Layout('components.layouts.auth')] #[Title('Submit a Ticket')] class exten
 }; ?>
 
 <div class="w-full">
+    {{-- Mandatory company picker: a full-screen modal with no dismiss affordance, so
+         the requester can only move on by choosing their company (or opting to type
+         an unlisted one). Each option shows the company's uploaded logo when it has
+         one; names wrap instead of truncating so they stay fully visible. --}}
+    @if ($companyPicker)
+        <div class="fixed inset-0 z-50 overflow-y-auto bg-canvas">
+            <div class="flex min-h-full flex-col">
+                <div class="mx-auto w-full max-w-2xl px-4 py-8 sm:px-6 sm:py-12">
+                    <header class="text-center">
+                        <span class="inline-flex items-center rounded-full border border-accent/25 bg-accent/10 px-3 py-1 text-xs font-medium text-accent">Required first step</span>
+                        <h2 class="mt-4 text-2xl font-semibold tracking-tight text-fg sm:text-3xl">Which company are you from?</h2>
+                        <p class="mx-auto mt-2 max-w-md text-sm leading-6 text-fg-muted">Choose your company so IT can route and prioritise your request.</p>
+                    </header>
+
+                    <div class="mt-6">
+                        <flux:input wire:model.live.debounce.300ms="companySearch" icon="magnifying-glass" placeholder="Search companies" size="sm" />
+                    </div>
+
+                    @if ($companies->isEmpty())
+                        <p class="mt-10 text-center text-sm text-fg-muted">{{ $companySearch !== '' ? 'No company matches “'.$companySearch.'”.' : 'No companies have been set up yet.' }}</p>
+                    @else
+                        <div class="mt-6 grid gap-3 sm:grid-cols-2">
+                            @foreach ($companies as $companyOption)
+                                <button type="button" wire:click="chooseCompany({{ $companyOption->id }})" class="flex w-full items-center gap-3 rounded-xl border border-border bg-surface p-4 text-left shadow-xs transition hover:border-accent hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-accent">
+                                    <span class="flex size-11 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-border bg-surface-muted text-sm font-semibold text-fg-muted">
+                                        @if ($companyOption->hasLogo())
+                                            <img src="{{ route('companies.logo', $companyOption) }}" alt="" class="size-full object-contain" />
+                                        @else
+                                            {{ Str::upper(Str::substr($companyOption->name, 0, 1)) }}
+                                        @endif
+                                    </span>
+                                    <span class="min-w-0 flex-1">
+                                        <span class="block text-sm font-semibold leading-snug text-fg [overflow-wrap:anywhere]">{{ $companyOption->name }}</span>
+                                        @if ($companyOption->code)
+                                            <span class="mt-0.5 block text-xs text-fg-subtle">{{ $companyOption->code }}</span>
+                                        @endif
+                                    </span>
+                                    <svg class="size-4 shrink-0 text-fg-subtle" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M7.22 3.77a.75.75 0 0 1 1.06 0l5.25 5.25a.75.75 0 0 1 0 1.06l-5.25 5.25a.75.75 0 1 1-1.06-1.06L11.94 9.5 7.22 4.83a.75.75 0 0 1 0-1.06Z" clip-rule="evenodd" /></svg>
+                                </button>
+                            @endforeach
+                        </div>
+                    @endif
+
+                    <div class="mt-8 text-center">
+                        <button type="button" wire:click="chooseOther" class="text-sm text-fg-muted underline underline-offset-4 transition hover:text-fg">Can't find your company? Enter it manually</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    @endif
+
     @if ($ticketNumber)
         <div class="rounded-xl border border-green-200 bg-green-50 p-6 text-center dark:border-green-900 dark:bg-green-950/40">
             <div class="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-green-100 text-green-600 dark:bg-green-900 dark:text-green-300">
@@ -174,12 +288,46 @@ new #[Layout('components.layouts.auth')] #[Title('Submit a Ticket')] class exten
             <flux:input wire:model="name" label="Your name" placeholder="Full name" />
 
             <div>
-                <flux:input wire:model="company" label="Company" placeholder="Company name" list="known-companies" />
-                <datalist id="known-companies">
-                    @foreach ($companyNames as $known)
-                        <option value="{{ $known }}"></option>
-                    @endforeach
-                </datalist>
+                <span class="mb-1 block text-sm font-medium">Company</span>
+
+                @if ($selectedCompany)
+                    <div class="flex items-center justify-between gap-3 rounded-lg border border-border bg-surface px-3 py-2">
+                        <span class="flex min-w-0 items-center gap-2">
+                            <span class="flex size-9 shrink-0 items-center justify-center overflow-hidden rounded-full border border-border bg-surface-muted text-xs font-semibold text-fg-muted">
+                                @if ($selectedCompany->hasLogo())
+                                    <img src="{{ route('companies.logo', $selectedCompany) }}" alt="" class="size-full object-contain" />
+                                @else
+                                    {{ Str::upper(Str::substr($selectedCompany->name, 0, 1)) }}
+                                @endif
+                            </span>
+                            <span class="min-w-0">
+                                <span class="block text-sm font-medium leading-snug text-fg [overflow-wrap:anywhere]">{{ $selectedCompany->name }}</span>
+                                @if ($selectedCompany->code)
+                                    <span class="block text-xs text-fg-subtle">{{ $selectedCompany->code }}</span>
+                                @endif
+                            </span>
+                        </span>
+                        <flux:button type="button" wire:click="openCompanyPicker" variant="subtle" size="sm" class="shrink-0">Change</flux:button>
+                    </div>
+                @elseif ($manualCompany)
+                    <flux:input wire:model="company" placeholder="Type your company name" list="known-companies" />
+                    <datalist id="known-companies">
+                        @foreach ($companyNames as $known)
+                            <option value="{{ $known }}"></option>
+                        @endforeach
+                    </datalist>
+                    <button type="button" wire:click="openCompanyPicker" class="mt-1.5 inline-flex items-center gap-1 text-sm text-fg-muted underline underline-offset-4 transition hover:text-fg">
+                        <svg class="size-3.5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M10 3a7 7 0 1 0 0 14 7 7 0 0 0 0-14ZM1.5 10a8.5 8.5 0 1 1 17 0 8.5 8.5 0 0 1-17 0Z" clip-rule="evenodd" /><path d="M10.75 6.5a.75.75 0 0 0-1.5 0v3.69l-1.72-1.72a.75.75 0 1 0-1.06 1.06l3 3a.75.75 0 0 0 1.06 0l3-3a.75.75 0 0 0-1.06-1.06l-1.78 1.78V6.5Z" /></svg>
+                        Choose from the list instead
+                    </button>
+                @else
+                    <button type="button" wire:click="openCompanyPicker" class="flex w-full items-center justify-between gap-3 rounded-lg border border-border bg-surface px-3 py-2 text-left text-sm text-fg-muted transition hover:border-accent hover:text-fg focus:outline-none focus-visible:ring-2 focus-visible:ring-accent">
+                        <span>Choose your company</span>
+                        <svg class="size-4 shrink-0" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M5.22 7.47a.75.75 0 0 1 1.06 0L10 11.19l3.72-3.72a.75.75 0 1 1 1.06 1.06l-4.25 4.25a.75.75 0 0 1-1.06 0L5.22 8.53a.75.75 0 0 1 0-1.06Z" clip-rule="evenodd" /></svg>
+                    </button>
+                @endif
+
+                @error('company') <p class="mt-1 text-xs text-red-600">{{ $message }}</p> @enderror
             </div>
 
             <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">

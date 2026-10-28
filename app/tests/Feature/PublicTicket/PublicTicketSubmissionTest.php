@@ -165,3 +165,39 @@ it('surfaces the public requester in the admin list and detail', function () {
         ->assertSee('Mira')
         ->assertSee('Web request');
 });
+
+it('opens the company picker on load and closes it once a company is chosen', function () {
+    $acme = Company::factory()->create(['name' => 'Acme Manufacturing']);
+
+    Volt::test('public.submit-ticket')
+        ->assertSet('companyPicker', true)
+        ->call('chooseCompany', $acme->id)
+        ->assertSet('companyPicker', false)
+        ->assertSet('companyId', $acme->id)
+        ->assertSet('company', 'Acme Manufacturing');
+});
+
+it('files the request under the company chosen in the picker', function () {
+    $globex = Company::factory()->create(['name' => 'Globex Corporation']);
+
+    Volt::test('public.submit-ticket')
+        ->call('chooseCompany', $globex->id)
+        ->set('name', 'Rosa')
+        ->set('contact', 'rosa@globex.test')
+        ->set('subject', 'VPN unreachable')
+        ->set('description', 'Cannot reach the VPN from home.')
+        ->call('submit')
+        ->assertHasNoErrors();
+
+    $ticket = Ticket::sole();
+
+    expect($ticket->company_id)->toBe($globex->id)
+        ->and($ticket->requester_company)->toBeNull();
+});
+
+it('reveals manual company entry as an escape hatch that keeps the picker closed', function () {
+    Volt::test('public.submit-ticket')
+        ->call('chooseOther')
+        ->assertSet('companyPicker', false)
+        ->assertSet('manualCompany', true);
+});
