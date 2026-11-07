@@ -43,6 +43,27 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Problem tally (recurring-issue dashboards)
+    |--------------------------------------------------------------------------
+    |
+    | "weeks" is the rolling window the tally aggregates over (admin and
+    | technician dashboards both read it; the admin view can widen it).
+    | "min_repeats" is how many tickets with the same normalised subject in
+    | one category count as a recurring problem. "similarity_threshold" is how
+    | aggressively similarly-worded subjects fold into the "possibly related"
+    | tier (word-overlap 0–1). "cache_ttl" is the seconds a computed payload
+    | is reused across dashboard polls; 0 disables caching (the test suite
+    | does exactly that, so tallies always reflect fresh fixtures).
+    */
+    'tally' => [
+        'weeks' => (int) env('TALLY_WEEKS', 8),
+        'min_repeats' => (int) env('TALLY_MIN_REPEATS', 2),
+        'similarity_threshold' => (float) env('TALLY_SIMILARITY', 0.6),
+        'cache_ttl' => (int) env('TALLY_CACHE_TTL', 90),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Public intake (the no-login submit-ticket form)
     |--------------------------------------------------------------------------
     |

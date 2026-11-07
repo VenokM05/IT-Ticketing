@@ -3,11 +3,14 @@
 namespace App\Services;
 
 use App\Enums\TicketStatus;
+use App\Models\KbArticle;
 use App\Models\Priority;
 use App\Models\Ticket;
+use App\Support\ProblemMatcher;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Cache;
 
 /**
  * Operational reporting (PRD Phase 6, §10.6). Builds one filtered ticket query and
@@ -246,6 +249,331 @@ class ReportService
             'resolved' => (int) ($resolved[$p] ?? 0),
             'closed' => (int) ($closed[$p] ?? 0),
         ])->all();
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Problem tally (recurring-issue dashboards)
+    |--------------------------------------------------------------------------
+    */
+
+    /**
+     * Recurring-problem tally for the dashboards: volumes grouped by category and
+     * priority over a rolling window, weekly frequency trend per category, and a
+     * two-tier repeat view — confirmed recurring (same normalised subject in a
+     * category) and a fuzzy "related" tier for similarly worded complaints
+     * (ProblemMatcher word overlap). Everything is derived in PHP like the rest
+     * of the reports so sqlite tests and MySQL production agree. Passing a
+     * `technician` or `company` filter scopes the whole tally, which is how the
+     * technician dashboard and the admin company slice reuse it.
+     *
+     * The payload is analytic, not transactional, so it is cached for
+     * config('tickets.tally.cache_ttl') seconds across dashboard poll cycles;
+     * the key pins filters, window and date (the window still rolls at
+     * midnight) and a TTL of 0 disables caching — what the test suite uses so
+     * fixtures are always reflected immediately.
+     *
+     * @param  array<string, mixed>  $filters  same keys as query()
+     * @return array<string, mixed>
+     */
+    public function problemTally(array $filters = [], ?int $weeks = null): array
+    {
+        $weeks = $weeks ?: (int) config('tickets.tally.weeks', 8);
+        $ttl = (int) config('tickets.tally.cache_ttl', 90);
+
+        $build = function () use ($filters, $weeks): array {
+            // Monday-aligned so "this week" is always the newest trend bucket.
+            $thisWeek = now()->startOfWeek(Carbon::MONDAY);
+            $start = $thisWeek->copy()->subWeeks($weeks - 1);
+
+            $tickets = $this->query($filters)->where('created_at', '>=', $start)->get();
+
+            $categories = $this->tallyCategories($tickets, $start, $thisWeek);
+            $recurring = $this->recurringSubjects($tickets);
+            $repeatTickets = collect($recurring)->sum('count');
+
+            return [
+                'weeks' => $weeks,
+                'start' => $start->toDateString(),
+                'end' => $thisWeek->toDateString(),
+                'totals' => [
+                    'tickets' => $tickets->count(),
+                    'categories' => count($categories),
+                    'recurring' => count($recurring),
+                    'repeat_rate' => $tickets->isEmpty() ? 0.0 : round($repeatTickets / $tickets->count() * 100, 1),
+                ],
+                'categories' => $categories,
+                'priorities' => $this->tallyPriorities($tickets),
+                'recurring' => $recurring,
+                'related' => $this->relatedSubjects($tickets),
+            ];
+        };
+
+        if ($ttl <= 0) {
+            return $build();
+        }
+
+        $key = 'problem-tally:'.md5(json_encode([$filters, $weeks, now()->toDateString()]));
+
+        return Cache::remember($key, $ttl, $build);
+    }
+
+    /**
+     * Per-category tally row: volume, open/resolved split, share of the window,
+     * week-over-week delta, zero-filled weekly trend, priority mix and the
+     * average resolution time. Sorted by volume, most frequent problem first.
+     *
+     * @param  Collection<int, Ticket>  $tickets
+     * @return array<int, array<string, mixed>>
+     */
+    private function tallyCategories(Collection $tickets, Carbon $start, Carbon $thisWeek): array
+    {
+        $total = max(1, $tickets->count());
+        $lastWeek = $thisWeek->copy()->subWeek();
+        $priorities = Priority::query()->get()->keyBy('key');
+
+        return $tickets
+            ->groupBy(fn (Ticket $t) => $t->category?->key ?? 'uncategorised')
+            ->map(function (Collection $group, string $key) use ($total, $start, $thisWeek, $lastWeek, $priorities) {
+                $weekly = $group
+                    ->groupBy(fn (Ticket $t) => $t->created_at->copy()->startOfWeek(Carbon::MONDAY)->toDateString())
+                    ->map->count();
+
+                // One bucket per window week, Monday-aligned, zero-filled.
+                $trend = [];
+                for ($week = $start->copy(); $week->lte($thisWeek); $week->addWeek()) {
+                    $stamp = $week->toDateString();
+                    $trend[] = ['week' => $stamp, 'count' => (int) ($weekly[$stamp] ?? 0)];
+                }
+
+                $thisCount = $group->filter(fn (Ticket $t) => $t->created_at->gte($thisWeek))->count();
+                $lastCount = $group->filter(fn (Ticket $t) => $t->created_at->gte($lastWeek) && $t->created_at->lt($thisWeek))->count();
+
+                $byPriority = $group
+                    ->groupBy(fn (Ticket $t) => $t->priority?->key ?? 'unranked')
+                    ->sortDesc()
+                    ->map(fn (Collection $g, string $p) => [
+                        'key' => $p,
+                        'label' => $priorities[$p]?->label() ?? ucfirst($p),
+                        'count' => $g->count(),
+                    ])
+                    ->values()
+                    ->all();
+
+                return [
+                    'key' => $key,
+                    'label' => $group->first()->category?->label() ?? 'Uncategorised',
+                    'count' => $group->count(),
+                    'open' => $group->where('status', '!=', TicketStatus::Closed)->count(),
+                    'resolved' => $group->whereIn('status', [TicketStatus::Resolved, TicketStatus::Closed])->count(),
+                    'share' => round($group->count() / $total * 100, 1),
+                    'this_week' => $thisCount,
+                    'last_week' => $lastCount,
+                    'delta' => $thisCount - $lastCount,
+                    'trend' => $trend,
+                    'by_priority' => $byPriority,
+                    'top_priority' => $byPriority[0] ?? null,
+                    'avg_resolution_minutes' => $this->avg($this->durations($group, 'created_at', 'resolved_at')),
+                ];
+            })
+            ->sortByDesc('count')
+            ->values()
+            ->all();
+    }
+
+    /**
+     * Priority-level tally: volume and open split per priority over the window,
+     * with the dominant category and average resolution time per priority.
+     *
+     * @param  Collection<int, Ticket>  $tickets
+     * @return array<int, array<string, mixed>>
+     */
+    private function tallyPriorities(Collection $tickets): array
+    {
+        return $tickets
+            ->groupBy(fn (Ticket $t) => $t->priority?->key ?? 'unranked')
+            ->map(function (Collection $group, string $key) {
+                return [
+                    'key' => $key,
+                    'label' => $group->first()->priority?->label() ?? ucfirst($key),
+                    'count' => $group->count(),
+                    'open' => $group->where('status', '!=', TicketStatus::Closed)->count(),
+                    'top_category' => $group
+                        ->countBy(fn (Ticket $t) => $t->category?->label() ?? 'Uncategorised')
+                        ->sortDesc()
+                        ->keys()
+                        ->first(),
+                    'avg_resolution_minutes' => $this->avg($this->durations($group, 'created_at', 'resolved_at')),
+                ];
+            })
+            ->sortByDesc('count')
+            ->values()
+            ->all();
+    }
+
+    /**
+     * Confirmed recurring problems: tickets sharing one normalised subject inside
+     * one category, at least config('tickets.tally.min_repeats') times (never
+     * below 2 — a single ticket is never a repeat). Blank and symbol-only
+     * subjects are excluded so they can never collapse into one bogus group.
+     * Most repeated first.
+     *
+     * @param  Collection<int, Ticket>  $tickets
+     * @return array<int, array<string, mixed>>
+     */
+    private function recurringSubjects(Collection $tickets): array
+    {
+        $min = max(2, (int) config('tickets.tally.min_repeats', 2));
+        $kb = $this->kbTitleIndex();
+
+        return $tickets
+            ->filter(fn (Ticket $t) => $this->normalizeSubject($t->subject) !== '')
+            ->groupBy(fn (Ticket $t) => ($t->category?->key ?? 'uncategorised').'|'.$this->normalizeSubject($t->subject))
+            ->filter(fn (Collection $group) => $group->count() >= $min)
+            ->map(fn (Collection $group) => $this->tallyGroupRow($group, $kb))
+            ->sortByDesc('count')
+            ->values()
+            ->all();
+    }
+
+    /**
+     * Fuzzy tier: the same complaint worded differently ("printer jam on 3rd
+     * floor" vs "printer jams on 3rd floor"). A single greedy pass clusters
+     * tickets per category by subject word-overlap (Jaccard) against the
+     * cluster seed; only clusters spanning more than one distinct normalised
+     * subject are surfaced, so pure exact repeats stay in the confirmed tier
+     * alone. Confidence is honest: the UI labels these "possibly related".
+     *
+     * @param  Collection<int, Ticket>  $tickets
+     * @return array<int, array<string, mixed>>
+     */
+    private function relatedSubjects(Collection $tickets): array
+    {
+        $threshold = (float) config('tickets.tally.similarity_threshold', 0.6);
+        $kb = $this->kbTitleIndex();
+
+        $clusters = [];
+        foreach ($tickets->sortByDesc('created_at') as $ticket) {
+            $tokens = ProblemMatcher::tokens($ticket->subject);
+            if ($tokens === []) {
+                continue;
+            }
+
+            $categoryKey = $ticket->category?->key ?? 'uncategorised';
+            $joined = false;
+            foreach (array_keys($clusters) as $i) {
+                if ($clusters[$i]['category'] === $categoryKey
+                    && ProblemMatcher::similarity($tokens, $clusters[$i]['tokens']) >= $threshold) {
+                    $clusters[$i]['members'][] = $ticket;
+                    $joined = true;
+                    break;
+                }
+            }
+
+            if (! $joined) {
+                $clusters[] = ['category' => $categoryKey, 'tokens' => $tokens, 'members' => [$ticket]];
+            }
+        }
+
+        return collect($clusters)
+            ->map(fn (array $cluster) => collect($cluster['members']))
+            ->filter(fn (Collection $members) => $members->count() >= 2
+                && $members->map(fn (Ticket $t) => $this->normalizeSubject($t->subject))->unique()->count() > 1)
+            ->map(fn (Collection $members) => $this->tallyGroupRow($members, $kb))
+            ->sortByDesc('count')
+            ->values()
+            ->all();
+    }
+
+    /**
+     * Shape one repeat-problem group for display. Shared by the exact tier and
+     * the fuzzy tier so both carry the same drill-down payload: requester
+     * spread (1 person filing 5 tickets is one broken device; 5 people is an
+     * infrastructure problem), ticket chips for exact drill-down, and a
+     * published-KB hint so recurring problems point at self-help coverage.
+     *
+     * @param  Collection<int, Ticket>  $group
+     * @param  list<array{title: string, category: ?string, tokens: list<string>}>  $kb
+     * @return array<string, mixed>
+     */
+    private function tallyGroupRow(Collection $group, array $kb): array
+    {
+        $sorted = $group->sortByDesc('created_at');
+        $latest = $sorted->first();
+        $categoryKey = $latest->category?->key ?? 'uncategorised';
+
+        return [
+            'subject' => $latest->subject,
+            'category_key' => $categoryKey,
+            'category_label' => $latest->category?->label() ?? 'Uncategorised',
+            'count' => $group->count(),
+            'open' => $group->where('status', '!=', TicketStatus::Closed)->count(),
+            'requesters' => $group->map(fn (Ticket $t) => $t->requesterName())->filter()->unique()->count(),
+            'last_seen' => $latest->created_at,
+            'ticket_ids' => $sorted->pluck('id')->take(5)->all(),
+            'tickets' => $sorted->take(5)
+                ->map(fn (Ticket $t) => ['id' => $t->id, 'number' => $t->ticket_number, 'status' => $t->status])
+                ->values()
+                ->all(),
+            'kb_title' => $this->matchKbArticle($kb, $categoryKey, $this->normalizeSubject($latest->subject), ProblemMatcher::tokens($latest->subject)),
+        ];
+    }
+
+    /**
+     * Published KB articles as a tiny in-memory index (titles are short and the
+     * table is curated, so this stays cheap next to the ticket scan).
+     *
+     * @return list<array{title: string, category: ?string, tokens: list<string>}>
+     */
+    private function kbTitleIndex(): array
+    {
+        return KbArticle::query()->published()->get(['title', 'category_key'])
+            ->map(fn (KbArticle $article) => [
+                'title' => (string) $article->title,
+                'category' => $article->category_key,
+                'tokens' => ProblemMatcher::tokens($article->title),
+            ])
+            ->filter(fn (array $entry) => $entry['tokens'] !== [])
+            ->values()
+            ->all();
+    }
+
+    /**
+     * The published article covering a problem, if any: an exact normalised
+     * title match wins outright, otherwise a same-category (or general)
+     * article with strong word overlap counts as coverage.
+     *
+     * @param  list<array{title: string, category: ?string, tokens: list<string}>}  $articles
+     * @param  list<string>  $subjectTokens
+     */
+    private function matchKbArticle(array $articles, string $categoryKey, string $normalizedSubject, array $subjectTokens): ?string
+    {
+        $probable = null;
+
+        foreach ($articles as $article) {
+            if ($article['category'] !== null && $article['category'] !== $categoryKey) {
+                continue;
+            }
+
+            if (implode(' ', $article['tokens']) === $normalizedSubject) {
+                return $article['title'];
+            }
+
+            if ($probable === null && ProblemMatcher::similarity($article['tokens'], $subjectTokens) >= 0.8) {
+                $probable = $article['title'];
+            }
+        }
+
+        return $probable;
+    }
+
+    /**
+     * Subject key for repeat detection: lower-cased, punctuation flattened to
+     * spaces, whitespace collapsed, so "WiFi is down!!" and "wifi is down" match.
+     */
+    private function normalizeSubject(?string $subject): string
+    {
+        return ProblemMatcher::normalized($subject);
     }
 
     /**

@@ -26,6 +26,13 @@ new #[Layout('components.layouts.app')] #[Title('Incident Broadcast')] class ext
     public function mount(): void
     {
         abort_unless(auth()->user()?->isAdmin(), 403);
+
+        // Deep link from the Problem Tally's "escalate" action: prefill the
+        // incident draft with the recurring subject so acknowledging a likely
+        // incident is a review step, not a re-typing job. Validation on send
+        // still applies, so a junk query string can only ever cost a click.
+        $this->subject = mb_substr((string) request()->query('subject'), 0, 150);
+        $this->message = mb_substr((string) request()->query('message'), 0, 5000);
     }
 
     /**

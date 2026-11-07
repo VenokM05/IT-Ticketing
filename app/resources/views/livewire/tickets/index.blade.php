@@ -41,6 +41,21 @@ new #[Layout('components.layouts.app')] #[Title('Tickets')] class extends Compon
     /** The list filter props a saved view can capture/restore. */
     private const VIEW_KEYS = ['search', 'status', 'priority', 'category', 'technician', 'companyId', 'from', 'to'];
 
+    /**
+     * Drill-down links (dashboard status counters, problem-tally rows) arrive
+     * as query strings; hydrate the filters from them on first load so the
+     * list opens pre-filtered on the ticket slice the tally pointed at.
+     */
+    public function mount(): void
+    {
+        foreach (self::VIEW_KEYS as $key) {
+            $value = request()->query($key);
+            if (is_string($value) && $value !== '') {
+                $this->{$key} = $value;
+            }
+        }
+    }
+
     public function updated($property): void
     {
         $this->resetPage();

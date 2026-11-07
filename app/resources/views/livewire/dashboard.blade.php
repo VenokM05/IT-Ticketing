@@ -233,6 +233,14 @@ new #[Layout('components.layouts.app')] #[Title('Dashboard')] class extends Comp
         </div>
     @endif
 
+    {{-- Problem tally: recurring issues. Admins get org-wide trends, technicians
+         their own queue's repeat offenders (separate Volt components). --}}
+    @if (auth()->user()->isAdmin())
+        <livewire:problem-tally.admin />
+    @else
+        <livewire:problem-tally.technician />
+    @endif
+
     {{-- Latest tickets (§10.1) --}}
     <div class="card overflow-hidden">
         <div class="flex items-center justify-between border-b border-border px-5 py-3.5">
